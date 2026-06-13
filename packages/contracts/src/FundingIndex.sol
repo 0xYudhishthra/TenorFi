@@ -5,7 +5,7 @@ pragma solidity 0.8.30;
 /// @notice On-chain latch for the realized perpetual funding rate of each settlement
 ///         period. A Chainlink CRE workflow reads the venue's funding rate (e.g.
 ///         Hyperliquid BTC hourly funding), reaches DON consensus, and writes it here
-///         through the KeystoneForwarder. `KeelSwap` reads these values to settle.
+///         through the KeystoneForwarder. Settlement contracts read these values.
 /// @dev    Rates are signed 1e18 fixed-point per-period fractional rates — funding can
 ///         and does go negative (Mar-2020: +0.01% -> -0.375% in days). Each period is
 ///         write-once: a period's realized funding must be immutable once it has been

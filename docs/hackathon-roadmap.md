@@ -1,8 +1,9 @@
 # Keel — Hackathon Execution Roadmap (8h sprint)
 
 **Window:** 17:00 → 01:00 (submit early — treat 00:15 as the real deadline).
-**Team (5):** Axel (Chainlink CRE) · Tomas (Ledger + math) · Shaun (UI + submission) · Lain (frontend) · You (contracts, backend, MCP).
+**Team (4):** Axel (Chainlink CRE) · Tomas (Ledger + math) · Shaun (MCP + submission) · You (contracts, backend, integration).
 **Biggest risk already retired:** the settlement core (`KeelSwap` + `FundingIndex`) is built and green (25 tests). We demo on the **tested Solidity path** — the SwapVM opcode is cut to roadmap.
+**Pivot:** MCP-first demo (agent-driven interaction) instead of UI. The MCP is the primary interface showing "agent proposes, human disposes."
 
 ---
 
@@ -18,7 +19,7 @@
 | Funding index units | **int256, 1e18, per-period fractional rate** | matches `KeelSwap`; edge converts annualized → per-period |
 | Ledger | real hardware sign for **open / close / topUp**; "re-match" narrated/stubbed | "continue" + "close" are the real branches |
 | CRE | must land **≥1 real on-chain write** (for the bounty); **EOA relayer** is the live-loop reliability fallback | don't let a flaky DON kill the demo loop |
-| MCP | read Hyperliquid + open/settle + `propose_decision` (unsigned brink tx) | cuttable last; must not block core |
+| MCP | **PRIMARY DEMO INTERFACE** — conversational agent drives Hyperliquid + Keel swap, gates brink decision to Ledger | the hero; simple web chat interface for fallback if MCP flaky |
 
 ---
 
@@ -28,11 +29,13 @@
 DEPLOY contracts (You, first 30 min)  ──unblocks──►  everyone
         │
         ├─► Funding index on-chain (Axel: CRE → fallback relayer)
-        ├─► UI reads swap state + index (Shaun + Lain)
+        ├─► MCP server + tools (Shaun: read Hyperliquid, open/settle swap, propose_decision)
         ├─► Ledger signs txs against deployed KeelSwap (Tomas)
-        └─► MCP operates the swap (You)
+        └─► Backend/keeper fires settle each period (You)
                                   │
-                          WIRE END-TO-END ──► live hourly settlement ──► Ledger moment ──► demo video ──► SUBMIT
+                          WIRE END-TO-END ──► MCP drives swap via conversation ──► Ledger moment ──► demo video ──► SUBMIT
+                                  │
+                     (fallback: simple web chat if MCP flaky)
 ```
 
 **Nothing on-chain starts until contracts are deployed and `deployments.json` is published.** That is your first 30 minutes.
@@ -42,21 +45,22 @@ DEPLOY contracts (You, first 30 min)  ──unblocks──►  everyone
 ## 2. Integration interfaces — lock these in the standup so we parallelize cleanly
 
 - **`packages/contracts/deployments.json`** — `{ chainId, rpc, MockUSDC, FundingIndex, KeelSwap, PERIOD_SECONDS, abis }`. Single source of truth for every other track.
-- **Period numbering:** `period = floor(unixSeconds / PERIOD_SECONDS)`. Axel writes the index keyed by `period`; the contract reads it; the UI displays it. **Everyone uses this exact formula.**
+- **Period numbering:** `period = floor(unixSeconds / PERIOD_SECONDS)`. Axel writes the index keyed by `period`; the contract reads it; the MCP displays it. **Everyone uses this exact formula.**
 - **Funding value:** annualized Hyperliquid funding → per-period 1e18 rate written to `setFundingIndex(period, value)`. Conversion happens at the edge (CRE workflow / relayer), NOT in the contract.
-- **Swap state for UI:** `swaps(id)` getter + events `SwapOpened`, `Settled(swapId, period, realized, diff, amount, payer, receiver)`, `SwapClosed`. `previewSettle(id, realized)` for projections.
-- **Brink flag (off-chain):** UI/MCP compute `remaining < cap × notional / 1e18` from the getter → surface the Ledger decision.
-- **Ethena replay data:** historical Hyperliquid BTC funding (CSV/JSON) — Axel/You provide; Shaun consumes on a time-slider.
+- **Swap state for MCP:** `swaps(id)` getter + events `SwapOpened`, `Settled(swapId, period, realized, diff, amount, payer, receiver)`, `SwapClosed`. `previewSettle(id, realized)` for projections.
+- **Brink flag (off-chain):** MCP computes `remaining < cap × notional / 1e18` from the getter → surface the Ledger decision.
+- **Ethena replay data:** historical Hyperliquid BTC funding (CSV/JSON) — Axel/You provide; used in demo narrative/comparison.
+- **MCP tool signatures:** `get_funding(market)`, `list_offers()`, `get_position(address)`, `open_hyperliquid_position(market, side, size)`, `open_keel_position(offerId)`, `settle(swapId, period)`, `topup_hyperliquid_margin(positionId, amount)`, `propose_decision(swapId)` → returns unsigned tx for Ledger.
 
 ---
 
 ## 3. Owners & parallel tracks
 
-### You — contracts · backend · MCP
+### You — contracts · backend · integration
 1. **(T+0:00–0:30) Deploy.** Deploy `MockUSDC`, `FundingIndex`, `KeelSwap` to HyperEVM testnet. Write `deployments.json` + ABIs. Faucet USDC to demo wallets. **Publish to the team.**
 2. **(0:30–1:15) Contract gaps.** Add `topUp(swapId, side, amount)` for the Ledger "continue" branch (+ 2–3 tests). Write a **seed script** that opens a matched demo swap with known params (hedger, speculator, notional, fixedRate, cap, period range).
-3. **(1:15–3:30) Backend.** Tiny indexer/keeper (viem): fires `settle(id, period)` each compressed period, exposes swap state + settlement feed to the UI (or UI reads chain directly — prefer direct reads, keeper just triggers settle). Stand up the **EOA relayer** path so it's ready if CRE slips.
-4. **(3:30–6:00) MCP.** `packages/mcp`: `get_funding`, `get_positions`, `get_swap`, `quote_fixed`, `open_swap`, `settle`, `preview_settle`, and the gated `propose_decision(swapId)` → returns the *unsigned* close/topUp tx for Tomas's Ledger to sign. **Cut to read+open+settle if time is short.**
+3. **(1:15–3:30) Backend/keeper.** Tiny indexer/keeper (viem): fires `settle(id, period)` each compressed period (120s), exposes swap state via simple REST API or direct chain reads for MCP. Stand up the **EOA relayer** path so it's ready if CRE slips.
+4. **(3:30–6:00) Integration support.** Help Shaun wire MCP tools to contracts, provide Hyperliquid testnet API integration guidance, ensure settlement loop + Ledger signing paths work end-to-end. Build simple web chat fallback if MCP integration hits blockers.
 
 ### Axel — Chainlink CRE
 1. **(0:00–0:30) Recon.** HyperEVM RPC + check CRE KeystoneForwarder availability. Get the `FundingIndex` address from You.
@@ -65,16 +69,22 @@ DEPLOY contracts (You, first 30 min)  ──unblocks──►  everyone
 4. **(2:30–4:00) Replay data + harden.** Pull historical BTC funding for the Ethena replay; hand to Shaun. Make the CRE write loop steady for the demo if it's working.
 
 ### Tomas — Ledger + math
-1. **(0:00–1:00) Math verification.** Verify `KeelSwap` netting with real numbers: `net = clamp(realized − fixed, ±cap) × notional`, no-default bound `cap × notional`, brink `remaining < cap × notional`. Lock the **annualized↔per-period Δt** conversion (document it for the UI). Confirm direction: `R > F` ⇒ hedger credited (matches contract).
-2. **(0:00 — in parallel) Confirm Ledger hardware is on hand + WebHID works in the browser.** If not, software-signer fallback but keep Ledger framing.
-3. **(1:00–4:00) Ledger integration.** Sign `open` / `close` / `topUp` from a Ledger (ethers + `@ledgerhq/hw-app-eth` or wallet-connect with Ledger). Build the **brink scenario**: drive realized funding extreme so one side nears the floor.
-4. **(4:00–6:00) Wire the Ledger moment into the UI** with Shaun: brink detected → UI surfaces close/continue → human signs on Ledger. This is WOW #4.
+1. **(0:00–1:00) Math verification.** Verify `KeelSwap` netting with real numbers: `net = clamp(realized − fixed, ±cap) × notional`, no-default bound `cap × notional`, brink `remaining < cap × notional`. Lock the **annualized↔per-period Δt** conversion (document for the team). Confirm direction: `R > F` ⇒ hedger credited (matches contract).
+2. **(0:00 — in parallel) Confirm Ledger hardware is on hand + signing library works.** Test with ethers + `@ledgerhq/hw-app-eth` or Ledger SDK. If hardware issues, software-signer fallback but keep Ledger framing.
+3. **(1:00–4:00) Ledger signing integration.** Build signing flow for `open` / `close` / `topUp` transactions. Create helper functions that MCP can call to get user signatures. Build the **brink scenario**: drive realized funding extreme so one side nears the floor.
+4. **(4:00–6:00) Wire the Ledger moment with Shaun's MCP:** brink detected → MCP calls `propose_decision` → presents unsigned tx options (close/continue) → human signs on Ledger → MCP submits signed tx. This is WOW #4.
 
-### Shaun + Lain — UI + submission
-1. **(0:00–1:30) Scaffold + shell with MOCK data** (don't wait on deploy): Next.js + the four surfaces — **(a) Ethena replay chart (hero)**, (b) lock card (floating ticker vs fixed quote + Lock/Take buttons), (c) position + hourly-settlement feed, (d) rates board (cut first if needed).
-2. **(1:30–4:00) Wire to chain** via `deployments.json`: read `swaps(id)` + events, show live settlement feed, funding index ticker. **Ethena replay** uses Axel's historical data on a slider.
-3. **(4:00–6:00) Ledger moment UI** (with Tomas) + polish the hero (the two diverging lines: "Same crash. One bled $8B. One didn't feel it.").
-4. **Lain** owns the Ethena replay chart end-to-end while Shaun wires the lock/settlement flow. **Shaun starts submission writeup at T+5:00** regardless of UI state.
+### Shaun — MCP + submission
+1. **(0:00–1:00) MCP scaffold.** Set up MCP server (`@modelcontextprotocol/sdk`): basic server, tool registration structure, prepare tool schemas for the 8 core tools (read: `get_funding`, `list_offers`, `get_position`; write: `open_hyperliquid_position`, `open_keel_position`, `settle`, `topup_hyperliquid_margin`; gated: `propose_decision`).
+2. **(1:00–3:00) Implement MCP tools** (wait for `deployments.json` at 0:30):
+   - **Read tools:** `get_funding(market)` via Hyperliquid API, `list_offers()` from hardcoded LP offer (fixedRate, cap, notional), `get_position(address)` from KeelSwap contract
+   - **Write tools:** `open_hyperliquid_position` via HL testnet API, `open_keel_position(offerId)` calls `KeelSwap.open`, `settle(swapId, period)` calls contract
+   - **Gated:** `propose_decision(swapId)` builds unsigned close/topUp tx for Ledger
+3. **(3:00–5:00) Wire settlement loop + Ledger integration** (with Tomas):
+   - Implement AFR/FFR comparison: when `AFR > FFR`, call `topup_hyperliquid_margin` with payout amount
+   - Detect brink (`remaining < cap × notional / 1e18`) → call `propose_decision` → hand unsigned tx to Ledger
+   - Test full flow: open position via MCP conversation → settlement fires → brink → Ledger signs
+4. **(5:00–6:00) Demo polish + submission writeup.** Prepare demo conversation script, record MCP-driven flow, write submission highlighting "agent proposes, human disposes" thesis. Start writeup at T+5:00 regardless of MCP state; fallback to simple web chat if MCP doesn't stabilize.
 
 ---
 
@@ -84,13 +94,13 @@ DEPLOY contracts (You, first 30 min)  ──unblocks──►  everyone
 |---|---|---|
 | 17:00 | **Standup** — lock §0 decisions, assign, confirm Ledger hw + HyperEVM RPC | go/no-go on chain |
 | 17:30 | **Contracts deployed**, `deployments.json` published | everyone unblocked |
-| 19:00 | UI shell live (mock data); CRE first write attempt; Ledger signs a test tx | — |
+| 19:00 | MCP server scaffold live; CRE first write attempt; Ledger signs a test tx | — |
 | 19:30 | **CRE checkpoint** — real write or fall back to relayer | live funding source decided |
-| 20:00 | **End-to-end thread working**: open swap → settle a period → UI shows it | the core demo exists |
-| 21:30 | Ethena replay hero + live settlement feed polished | hero locked |
-| 22:30 | **Ledger moment** wired; MCP cameo working (or cut) | feature freeze approaches |
+| 20:00 | **End-to-end thread working**: MCP opens swap → settle a period → MCP reads state | the core demo exists |
+| 21:30 | MCP settlement loop working (AFR/FFR comparison → topup) | hero flow locked |
+| 22:30 | **Ledger moment** wired via MCP; full conversation flow tested | feature freeze approaches |
 | 23:00 | **FEATURE FREEZE** — only bug-fixes on the demo path after this | — |
-| 23:00–00:15 | Demo video + submission writeup + bounty applications | — |
+| 23:00–00:15 | Demo video (MCP conversation) + submission writeup + bounty applications | — |
 | 00:15 | **SUBMIT** (45 min buffer for portal issues) | done |
 
 ---
@@ -101,37 +111,48 @@ DEPLOY contracts (You, first 30 min)  ──unblocks──►  everyone
 |---|---|---|
 | CRE slow / forwarder missing on HyperEVM | not writing by 19:30 | EOA relayer posts the real API-derived index; keep 1 CRE write for the bounty |
 | HyperEVM testnet down / RPC flaky | deploy fails in first 30 min | Base Sepolia, else local **anvil** for the demo (we need no EIP-1153 — plain Solidity) |
-| Ledger hardware / WebHID issues | confirmed at standup | software signer, keep Ledger framing; get ≥1 real Ledger sign on video if possible |
-| UI over-scoped | behind at 21:30 | ship hero (Ethena replay) + lock card + settlement feed; cut rates board |
-| MCP eats core time | behind at 20:00 | cut MCP to read+open+settle, or to a roadmap mention; never block the core demo |
+| Ledger hardware / signing library issues | confirmed at standup | software signer, keep Ledger framing; get ≥1 real Ledger sign on video if possible |
+| MCP integration blockers (SDK issues, tool wiring) | behind at 21:30 | simple web chat interface calling contract functions directly; demonstrate agent-gated flow via script |
+| Hyperliquid testnet API rate limits / flaky | during MCP testing | mock Hyperliquid responses in MCP tools; show API integration in code, demo with mocked data |
 | Settlement reverts at brink (`InsufficientCollateral`) | by design | that's the brink — detect off-chain, surface the Ledger decision; `topUp` to continue |
 
 ---
 
 ## 6. Demo script (60–90s) — what we actually show
 
-1. **Ethena replay (hero):** locked vs unlocked on the Oct-2025 funding crash slider — diverging lines.
-2. **One-click lock:** open a swap, real tx on HyperEVM.
-3. **Live hourly settlement:** compressed periods settle in USDC; funding from CRE/relayer; show pre-locked collateral → "no default possible."
-4. **The Ledger moment:** drive collateral to the brink → UI surfaces close / continue → a human signs on the **Ledger**.
-5. **MCP cameo (if alive):** drive Keel from Claude — agent reads Hyperliquid, opens/settles, and at the brink hands the decision to the Ledger. *Agent proposes, human disposes.*
+**THE CONVERSATIONAL FLOW (MCP-driven, agent proposes / human disposes):**
 
-**Be honest on screen:** the lock + settlements are real (testnet); the crash is a *replay* of real historical funding on a slider.
+1. **Open via conversation:** User tells the MCP: *"Create a long on BTC on Hyperliquid and fix the funding rate."* MCP reads available offers, presents options, user picks one. **Agent proposes → user signs on Ledger → both legs open** (Hyperliquid perp + Keel swap, real txs on HyperEVM).
+
+2. **Live settlement loop:** Compressed periods (120s each) settle automatically. Show MCP monitoring: *"AFR is 0.15%, FFR is 0.10% — funding is high, protocol pays you $X, topping up your Hyperliquid margin."* Real USDC movements on-chain.
+
+3. **The Ethena comparison:** Narrate alongside: *"This is the Oct-2025 crash that bled Ethena $8B. Your rate? Still locked at 10%."* Show historical data vs flat locked line.
+
+4. **The Ledger moment (hero):** Drive funding extreme → collateral hits brink. MCP detects it and says: *"Your collateral is low. Options: (1) Close now, (2) Add more collateral and continue. Sign on your Ledger to decide."* **Human picks up Ledger, signs the decision.** *Agent proposes, human disposes* — demonstrated live, not claimed.
+
+5. **Closing beat:** MCP confirms: *"Position closed. You locked certainty when the market swung wild."*
+
+**Be honest on screen:** the swap, settlements, and Ledger signatures are real (HyperEVM testnet); the Ethena comparison uses real historical funding data in the narration.
 
 ---
 
 ## 7. Submission checklist (Shaun, from 23:00)
 
-- [ ] Demo video (the script above)
-- [ ] Project description + the Ethena hook
-- [ ] Architecture diagram (CRE → Aqua/KeelSwap → Ledger, on HyperEVM)
-- [ ] Repo link + deployed addresses (`deployments.json`)
-- [ ] Bounty applications: **1inch Aqua**, **Chainlink CRE** (link the real write tx), **Ledger** (confirm the prize exists)
-- [ ] "Real vs scripted" note (credibility)
-- [ ] Team + roles
+- [ ] Demo video (MCP conversation flow from script above — show terminal/chat with MCP, Ledger signing moment)
+- [ ] Project description + the Ethena hook + **"agent proposes, human disposes" thesis**
+- [ ] Architecture diagram (HL API → MCP → CRE → KeelSwap → Ledger, on HyperEVM)
+- [ ] Repo link + deployed addresses (`deployments.json`) + **MCP server code**
+- [ ] Bounty applications:
+  - **1inch Aqua** (funding-rate swap built on Aqua, collateral as virtual balances; plain Solidity settlement core, SwapVM opcode is roadmap)
+  - **Chainlink CRE** (link the real write tx, explain funding oracle)
+  - **Ledger** (confirm the prize exists — highlight human-gated decision at brink)
+- [ ] "Real vs scripted" note (swap/settlement real on testnet; Ethena comparison uses historical data)
+- [ ] Team + roles (Shaun: MCP, You: contracts/backend, Axel: CRE, Tomas: Ledger/math)
 
 ---
 
 ## 8. Explicitly NOT building tonight
 
-SwapVM opcode · AMM/LP imbalance backstop · cumulative accumulator · cross-chain collateral · re-match logic (narrated). All are roadmap — say so if asked.
+**UI (replaced by MCP)** · SwapVM opcode · AMM/LP imbalance backstop · cumulative accumulator · cross-chain collateral · re-match logic (narrated). All are roadmap — say so if asked.
+
+**The pivot:** MCP is the demo interface. A polished rates-trading UI (Ethena replay chart, lock card, settlement feed) is deferred to post-hackathon. Tonight we prove "agent proposes, human disposes" via a conversational MCP flow.

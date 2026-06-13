@@ -96,7 +96,7 @@ This is the human-in-the-loop checkpoint: **the agent proposes, but the decision
 ---
 
 ## 6. Architecture (Aqua at the center)
-**The 3-layer stack:** **Chainlink CRE** (the funding-rate oracle) → **1inch Aqua / SwapVM** (custodies collateral as live virtual balances and nets fixed-vs-floating each period) → **LI.FI** (cross-chain collateral onboarding — detailed in the LI.FI section, owned by the integration lead).
+**The 3-layer stack:** **Chainlink CRE** (the funding-rate oracle) → **1inch Aqua / SwapVM** (custodies collateral as live virtual balances and nets fixed-vs-floating each period) → **LI.FI Composer** (one-click onboarding — bundles cross-chain USDC + a deposit into **both** legs of the hedge into a single Flow; detailed in the LI.FI section).
 
 **The full flow:** Chainlink CRE reads BTC's real funding rate from **Hyperliquid** each period → writes it on-chain as a **funding index** → the swap contract on **1inch Aqua** reads that index, computes fixed-vs-floating, and transfers the difference between the two parties → settlement and payout in **USDC**. **The swap is deployed on Ethereum Sepolia** (CRE and LI.FI support it, and we deploy our own Aqua + router there); **Hyperliquid is the funding-rate data source.**
 
@@ -121,9 +121,13 @@ This is the human-in-the-loop checkpoint: **the agent proposes, but the decision
 *Pitch to 1inch:* "We didn't bolt Aqua onto a swap — we built a **periodic-settlement derivative inside SwapVM**, with collateral that never goes idle. Aqua doing something it was never shown doing before."
 
 **Chainlink CRE — the oracle that doesn't exist.** There's no on-chain funding-rate oracle. CRE fetches Hyperliquid funding via API, reaches DON consensus, writes it on-chain. Without CRE there's nothing to swap.
-**LI.FI — cross-chain collateral onboarding.** A hedger funds and opens the position with USDC from any chain in one Composer flow, so capital location is never a barrier to hedging. *(Detailed in the LI.FI section, owned by the integration lead.)*
+**LI.FI Composer — one-click dual-leg onboarding.** The hedge only works if **both legs open together**: a Hyperliquid perp *and* the Keel swap. LI.FI Composer makes that one signature — the user signs once and Composer orchestrates the whole onboarding as a single bundled **Flow**: it (a) **brings the user's USDC from any chain**, (b) **deposits collateral into Hyperliquid** (the perp leg) and (c) **opens the swap position in our protocol** (the Keel leg) — all in one transaction.
+- **Accuracy caveat (don't overclaim):** LI.FI's documented Hyperliquid integration **deposits collateral into Hyperliquid** ("step into HyperCore in one step") — it does **not** itself place the leveraged perp order. So LI.FI's precise role is *"orchestrates cross-chain onboarding + deposits into both legs in one Flow"*; the **actual perp order is fired via the Hyperliquid API within the same flow** (driven by the MCP — see the agent layer). Do not say "LI.FI opens the perp."
+- **Precedent:** a prior LI.FI hackathon winner (**Magnolia**) did 1-click delta-neutral funding positions across Hyperliquid using LI.FI — the same one-signature, dual-venue pattern.
 
-**One line each:** **Aqua = the engine** (the table, collateral stays alive) · **CRE = the thermometer** (measures funding, puts it on-chain) · **LI.FI = the on-ramp** (brings collateral cross-chain). *Pull any one and the product breaks — but Aqua is the one we push furthest.* Settlement currency is **USDC on Ethereum Sepolia**.
+> *Pitch:* "The hedge only works if both legs open together — **LI.FI Composer bundles the perp-leg deposit and the swap position into one click.** Without it, the user assembles the hedge by hand across two venues."
+
+**One line each:** **Aqua = the engine** (the table, collateral stays alive) · **CRE = the thermometer** (measures funding, puts it on-chain) · **LI.FI = the on-ramp** (one click brings collateral cross-chain into *both* legs). *Pull any one and the product breaks — but Aqua is the one we push furthest.* Settlement currency is **USDC on Ethereum Sepolia**.
 
 ### The agent layer (MCP) — the one-click front door (agent proposes, human disposes)
 The **Keel MCP** is how a user enters in one conversation. The agent orchestrates **both legs** of the hedge on the user's behalf; the user confirms with a single in-app signature.
@@ -136,9 +140,9 @@ The **Keel MCP** is how a user enters in one conversation. The agent orchestrate
 
 The "3 fixed-rate positions" are **our LP's standing offers** — each is a `fixed rate` + a `max coverage` (where coverage = `cap × notional`, the most the insurance pays out). The user picks one and **confirms to open** (a single in-app signature).
 
-**Two legs, one click.** On that signature the MCP opens:
-1. **The Hyperliquid perp** — the user's actual leveraged long, via the **Hyperliquid testnet API**. *(The MCP acts on the user's behalf; the Keel **contract** never touches Hyperliquid — see §4 core insight.)*
-2. **The Keel position** — the fixed-rate swap against our LP (`KeelSwap.open`). The user's collateral is now locked in as insurance.
+**Two legs, one click (via LI.FI Composer).** On that single signature, a **LI.FI Composer Flow** brings the user's USDC from any chain and deposits collateral into **both** legs in one transaction; the MCP fires the actual perp order via API inside the same flow:
+1. **The Hyperliquid perp** — Composer **deposits the collateral into Hyperliquid** ("step into HyperCore in one step"); the **MCP places the leveraged long via the Hyperliquid testnet API** within the same flow. *(LI.FI deposits, it does **not** place the order. The MCP acts on the user's behalf; the Keel **contract** never touches Hyperliquid — see §4 core insight.)*
+2. **The Keel position** — the same Composer Flow opens the fixed-rate swap against our LP (`KeelSwap.open`). The user's collateral is now locked in as insurance.
 
 **The settlement loop (each period, while the perp is open).** Let `AFR` = Actual Funding Rate (realized, from CRE) and `FFR` = Fixed Funding Rate (the locked rate):
 - **`AFR > FFR`** → funding is high and draining the perp's margin → **the protocol pays the user, and the MCP routes that payout into the Hyperliquid position's margin** (tops it up — the hedge in action).
@@ -147,8 +151,9 @@ The "3 fixed-rate positions" are **our LP's standing offers** — each is a `fix
 This is the §4 algebraic cancellation made real: the Keel payout refills exactly the margin that high funding drains, so the user's **net funding cost stays pinned at the fixed rate.** (`AFR`/`FFR` map 1:1 to `realized`/`fixed` in `KeelSwap`; `AFR > FFR` ⇒ hedger credited — consistent with the tested contract.)
 
 ```
-[Chat on MCP] ──► [MCP] ──┬──► Create Hyperliquid perp        (HL testnet API)
-  pick offer, confirm     └──► Create Keel position           (KeelSwap.open) → capital locked
+[Chat on MCP] ──► [MCP] ──► [LI.FI Composer Flow] ──┬──► Deposit collateral into Hyperliquid (HyperCore)
+  "long BTC + fix funding"   one signature           │      └─ MCP places the perp order (HL testnet API)
+  pick offer, confirm        cross-chain USDC        └──► Open Keel position (KeelSwap.open) → capital locked
                                         │
                      ┌──────────────────▼──── loop while perp open ─────────────────┐
                      │  Is the HL position open? ── yes ──► AFR vs FFR?              │
@@ -170,7 +175,7 @@ This is the §4 algebraic cancellation made real: the Keel payout refills exactl
 - **1inch Aqua / SwapVM** — ✅ **BUILT + TESTED** (`packages/swapvm`). A custom `_fundingSettle` SwapVM instruction (`amountOut = clamp(R−F,±cap)×N`) registered in our own router (`KeelSwapVMRouter`); virtual balances keep collateral in-wallet. Verified end-to-end: a settlement executes through the opcode and **moves real USDC via Aqua** (5 tests incl. e2e). Each period is one atomic, keeper/CRE-triggered swap; recurrence is external.
 - **Chainlink CRE** — verified (chainlink-cre-skill / docs): HTTP/Confidential-HTTP → DON consensus → on-chain write (KeystoneForwarder). Reading Hyperliquid funding via API and posting an index is squarely in scope. ✓
 - **Ethereum Sepolia** — the deploy target for the swap (Aqua, CRE, and LI.FI all support it; EIP-1153 transient storage is available, so the SwapVM opcode runs). Open items: confirm the **CRE KeystoneForwarder** address on Ethereum Sepolia (else EOA relayer fallback); test USDC (canonical vs `MockUSDC`, already in repo). **Hyperliquid** is the funding-rate data source (read via API by CRE), not a deploy target.
-- **LI.FI** — cross-chain collateral onboarding via a Composer flow. *(Owned by the integration lead — see the LI.FI section.)*
+- **LI.FI Composer** — one-click dual-leg onboarding: cross-chain USDC → deposit into Hyperliquid (HyperCore) **+** open the Keel swap in one Flow. The Hyperliquid deposit step is documented ("step into HyperCore in one step"); the Magnolia hackathon winner is precedent for the 1-click delta-neutral pattern. **TODO (integration lead):** confirm Composer can chain an **arbitrary contract call (`KeelSwap.open`) into the same Flow as the HL deposit** — if a single Flow can't bundle both, fall back to two sequenced calls behind one MCP confirmation. The perp order itself is fired via the **Hyperliquid API** by the MCP inside the flow (LI.FI deposits collateral; it does not place the order).
 
 ### The opcode + MVP scope
 **The whole on-chain core = one custom opcode + one oracle-write + two swaps:**
@@ -206,6 +211,12 @@ This is the §4 algebraic cancellation made real: the Keel payout refills exactl
 ---
 
 ## 7. User flows
+- **Primary entry path (Chat on MCP → LI.FI Composer → live hedge):**
+  1. **Chat on the MCP** — the user requests *"long BTC + fixed funding rate."*
+  2. **Pick an offer** — the MCP lists our LP's standing offers (`fixed rate` + `max coverage = cap × notional`); the user picks one and confirms with **one signature**.
+  3. **LI.FI Composer Flow (one click)** — brings cross-chain USDC and, in a single bundled Flow, **deposits collateral into Hyperliquid** (the MCP fires the perp order via the HL API in the same flow) **and opens the Keel swap position** (`KeelSwap.open`). *(LI.FI deposits into both legs; it does not place the perp order.)*
+  4. **Position live, capital locked** — both legs are open; the user's collateral backs the swap as insurance.
+  5. **CRE feeds the funding index** → **hourly settlement**: `AFR > FFR` → **the protocol pays the user** (routed to top up HL margin); `AFR < FFR` → **the user's position funds the protocol/LP pool** (the cost of certainty). Net funding cost stays pinned at the fixed rate.
 - **Hedger (customer / taker):** open Keel (UI or via the MCP) → see our **offered fixed rate** next to the live floating ticker → **Take / Lock** (confirm the `approve` + `open` in-app) → watch real funding bounce while your rate stays flat → per-period settlement in USDC → close at maturity.
 - **Keel LP (us / maker):** quote a **consistent fixed rate** (≈ E[funding] + spread), pre-fund collateral, stand as the counterparty so hedgers lock instantly; at a side's brink, confirm the close / top-up.
 - **Speculator — phase 2 (not built):** take the LP's side to bet on funding; the LP then only covers the residual imbalance.
@@ -217,7 +228,7 @@ This is the §4 algebraic cancellation made real: the Keel payout refills exactl
 |---|---|---|
 | **1inch — Build an Aqua App** | $5,000 | The funding-rate-swap **AMM** + `_fundingSettle` SwapVM opcode (their AMM/Options examples; SwapVM scored higher). |
 | **Chainlink — CRE** | $6,000 (3×$2k) | The on-chain **funding-rate oracle** — without it the swap can't settle. Real external-data → DON → on-chain state change. Best, most honest Chainlink fit of the event. |
-| **LI.FI — Composer** | $4,000 | Cross-chain collateral onboarding: fund + open the position with USDC from any chain in one Composer flow (fits the Agentic Workflows track via the MCP). *(Owned by the integration lead.)* |
+| **LI.FI — Composer** (Most Innovative / Best UX) | $4,000 | **One-click dual-position onboarding:** a single Composer Flow brings cross-chain USDC and deposits into **both** legs — the Hyperliquid perp deposit *and* the Keel swap (`KeelSwap.open`). The hedge only works if both legs open together; without Composer the user assembles it by hand across two venues. Precedent: the Magnolia hackathon winner did 1-click delta-neutral Hyperliquid positions via LI.FI. *(LI.FI deposits collateral into both legs; the perp order is fired via the HL API in the same flow.)* |
 
 The three pieces are all load-bearing — no "bolted on?" risk: **CRE** brings the funding number, **Aqua** settles it, **LI.FI** brings the capital cross-chain. Pull any one and the product breaks.
 

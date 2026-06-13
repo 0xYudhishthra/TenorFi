@@ -96,11 +96,7 @@ contract KeelSwap {
         address receiver
     );
 
-    event SwapClosed(
-        uint256 indexed swapId,
-        uint256 hedgerPayout,
-        uint256 speculatorPayout
-    );
+    event SwapClosed(uint256 indexed swapId, uint256 hedgerPayout, uint256 speculatorPayout);
 
     error ZeroAddress();
     error SamePartySwap();
@@ -136,7 +132,9 @@ contract KeelSwap {
         uint256 hedgerCollateral,
         uint256 speculatorCollateral
     ) external returns (uint256 swapId) {
-        if (hedger == address(0) || speculator == address(0)) revert ZeroAddress();
+        if (hedger == address(0) || speculator == address(0)) {
+            revert ZeroAddress();
+        }
         if (hedger == speculator) revert SamePartySwap();
         if (notional == 0) revert ZeroNotional();
         if (cap == 0) revert ZeroCap();

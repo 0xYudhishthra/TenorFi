@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import { Simulator } from "@1inch/solidity-utils/contracts/mixins/Simulator.sol";
+import { Simulator } from "@1inch/swap-vm/src/libs/Simulator.sol";
 
 import { Context } from "@1inch/swap-vm/src/libs/VM.sol";
 import { SwapVM } from "@1inch/swap-vm/src/SwapVM.sol";
@@ -14,8 +14,8 @@ import { KeelOpcodes } from "./KeelOpcodes.sol";
 ///         SwapVM to execute Keel funding-settlement programs (the bounty explicitly allows
 ///         deploying your own SwapVM with custom instructions).
 contract KeelSwapVMRouter is Simulator, SwapVM, KeelOpcodes {
-    constructor(address aqua, address weth, address owner, string memory name, string memory version)
-        SwapVM(aqua, weth, owner, name, version)
+    constructor(address aqua, string memory name, string memory version)
+        SwapVM(aqua, name, version)
         KeelOpcodes(aqua)
     { }
 

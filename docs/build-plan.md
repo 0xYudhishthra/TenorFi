@@ -56,7 +56,7 @@ Everything downstream builds on these (see design-doc §6 *Settlement math*):
   - Unit tests: net cashflow math, the cap, no-default invariant, no double-settle.
 - [ ] **M2 — Chainlink CRE workflow.** Read Hyperliquid funding → DON consensus →
     write the funding index on-chain to a consumer on HyperEVM (uses `chainlink-cre-skill`).
-    Fallback: EOA relayer posting the real API-derived index.
+    Fallback: EOA relayer posting the real API-derived index. **See `docs/chainlink-cre-notes.md`.**
 - [ ] **M3 — `_fundingSettle` SwapVM opcode.** Port the settlement math into a custom
     Aqua opcode; keep the Solidity path as fallback until validated on-chain. Gated by the
     two math decisions above + EIP-1153 support on HyperEVM.

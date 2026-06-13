@@ -1,0 +1,11 @@
+{
+  "name": "@keel/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Keel settlement core: KeelSwap + FundingIndex latch.",
+  "scripts": {
+    "build": "forge build",
+    "test": "forge test -vv",
+    "fmt": "forge fmt"
+  }
+}

@@ -1,13 +1,13 @@
 # Chainlink CRE — Integration Notes (Axel)
 
 > Consolidated CRE notes reflecting the **current** system (LP-primary RFQ · MCP two-leg ·
-> AFR/FFR settlement · custom SwapVM `_fundingSettle` opcode · HyperEVM). Source of truth for
+> AFR/FFR settlement · custom SwapVM `_fundingSettle` opcode · Ethereum Sepolia). Source of truth for
 > the funding oracle. See design-doc §6 + §12 for the wider context.
 
 ## Role — the oracle that doesn't exist
 CRE is the **funding-rate oracle**: it reads BTC funding from **Hyperliquid**, reaches DON
 consensus, and writes it on-chain. Without it nothing settles. Because we read funding from
-Hyperliquid *and* deploy on HyperEVM, **the oracle source and the settlement chain are the same venue.**
+Hyperliquid *and* deploy on Ethereum Sepolia, **the oracle source and the settlement chain are the same venue.**
 
 CRE flow: **cron trigger → HTTP fetch HL funding → DON consensus → KeystoneForwarder →
 `FundingIndex.setFundingIndex(period, value)`**.
@@ -48,7 +48,7 @@ CRE flow: **cron trigger → HTTP fetch HL funding → DON consensus → Keyston
   reading a feed does **not** count. Use the CRE SDK (Go or TS) + CRE CLI.
 
 ## Build steps (Axel)
-1. **(recon)** HyperEVM RPC + check **KeystoneForwarder availability** on HyperEVM testnet. Get
+1. **(recon)** Ethereum Sepolia RPC + check **KeystoneForwarder availability** on Ethereum Sepolia. Get
    the deployed `FundingIndex` address from the deploy step (`deployments.json`).
 2. Write the CRE workflow: HTTP fetch HL BTC funding → DON consensus → convert annualized→per-period
    → `setFundingIndex(period, value)` via the forwarder.

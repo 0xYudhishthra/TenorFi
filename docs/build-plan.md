@@ -14,15 +14,13 @@ day one; the Aqua opcode and CRE workflow layer on top of the same settlement ma
   (read latched index → net `(realized − fixed) × notional`, capped → pull/push).
 - **MVP = one matched swap** (one hedger + one speculator) + the funding index + a keeper
   firing hourly. The AMM/LP backstop for imbalance is phase 2 — mocked for the demo.
-- **Everything deploys on Hyperliquid testnet (HyperEVM).** Oracle source = settlement
+- **Everything deploys on Ethereum Sepolia.** Oracle source = settlement
   chain. (Replaces the earlier Arc plan.)
-- **Third pillar is Ledger, not Arc.** The collateral-low decision (close / re-match /
-  continue) is signed by a human on a Ledger — the deliberate anti-agent stance. USDC
-  settlement happens on HyperEVM.
-- **Agent layer via MCP (in MVP scope).** A Keel MCP lets an agent read Hyperliquid and
-  operate the swap (open / monitor / settle), but the brink decision is *prepared* by the
-  agent and *signed* by a human on a Ledger — agent proposes, human disposes. The MCP must
-  never hold the key for the brink tx. Keep the deterministic claim precise: no AI in the
+- **Third pillar is LI.FI.** Cross-chain collateral onboarding: a hedger funds + opens the
+  hedge with USDC from any chain in one Composer flow. USDC settlement happens on Ethereum Sepolia.
+- **Agent layer via MCP (in MVP scope).** A Keel MCP lets an agent operate the swap (open /
+  monitor / settle), but the brink decision is *prepared* by the agent and *confirmed* by the
+  user — agent proposes, user confirms. Keep the deterministic claim precise: no AI in the
   settlement math; the agent is an operating layer on top.
 - **No secrets in the repo.** `.env` is git-ignored; `.env.example` documents the keys.
 
@@ -30,10 +28,10 @@ day one; the Aqua opcode and CRE workflow layer on top of the same settlement ma
 
 Prove the stack before building UI. Each check has a fallback:
 1. **CRE → on-chain index.** Can CRE fetch Hyperliquid BTC funding via API and write the
-   index to a consumer on HyperEVM testnet? **Else** → EOA relayer posts the real
+   index to a consumer on Ethereum Sepolia? **Else** → EOA relayer posts the real
    API-derived index.
 2. **Custom SwapVM opcode.** Can `_fundingSettle` be written + deployed quickly on
-   HyperEVM? **Else** → drop to the plain-Solidity settlement core (M1, already built) and
+   Ethereum Sepolia? **Else** → drop to the plain-Solidity settlement core (M1, already built) and
    move the opcode to roadmap. Confirm EIP-1153 (transient storage) support too.
 3. **Settlement loop.** Can the contract read the index and transfer between two parties in
    one period? This is the core — ✅ already proven by `KeelSwap` (25 tests green).
@@ -55,24 +53,24 @@ Everything downstream builds on these (see design-doc §6 *Settlement math*):
     against pre-locked collateral, cap per period, close. No double-settle.
   - Unit tests: net cashflow math, the cap, no-default invariant, no double-settle.
 - [ ] **M2 — Chainlink CRE workflow.** Read Hyperliquid funding → DON consensus →
-    write the funding index on-chain to a consumer on HyperEVM (uses `chainlink-cre-skill`).
+    write the funding index on-chain to a consumer on Ethereum Sepolia (uses `chainlink-cre-skill`).
     Fallback: EOA relayer posting the real API-derived index. **See `docs/chainlink-cre-notes.md`.**
 - [ ] **M3 — `_fundingSettle` SwapVM opcode.** Port the settlement math into a custom
     Aqua opcode; keep the Solidity path as fallback until validated on-chain. Gated by the
-    two math decisions above + EIP-1153 support on HyperEVM.
+    two math decisions above + EIP-1153 support on Ethereum Sepolia.
 - [ ] **M4 — keeper.** Hourly `settle()` trigger (and/or CRE-triggered).
 - [ ] **M5 — web app.** Rates board · lock card · hourly-settlement feed · Ethena replay ·
-    the **Ledger moment** (human signs close / re-match / continue at the brink).
-- [ ] **M6 — HyperEVM deploy + USDC settlement.** Deploy everything on Hyperliquid testnet
-    (oracle source = settlement chain). Confirm EIP-1153 (transient storage); test USDC
-    (canonical vs `MockUSDC`). USDC settlement on HyperEVM.
+    the **brink decision** (agent proposes, user confirms close / re-match / continue).
+- [ ] **M6 — Ethereum Sepolia deploy + USDC settlement.** Deploy everything on Ethereum Sepolia
+    (Hyperliquid = funding source only). Confirm the CRE forwarder; test USDC
+    (canonical vs `MockUSDC`). EIP-1153 is available post-Dencun.
 - [ ] **M7 — Keel MCP (agent layer, the one-click front door).** MCP server that orchestrates
     **both legs** in one conversation: `list_offers` (the LP's fixed-rate offers, e.g. "5% /
-    $20k coverage") → on a **Ledger** signature, `open_hyperliquid_position` (HL testnet API)
+    $20k coverage") → on a **user** signature, `open_hyperliquid_position` (HL testnet API)
     **+** `open_keel_position` (`KeelSwap.open`). Per period: `settle` → on `AFR > FFR`,
     `topup_hyperliquid_margin` (route the payout to the perp's margin). Gated `propose_decision`
-    returns the *unsigned* brink tx for the Ledger. Agent proposes, human disposes; the MCP
-    never holds a signing key. (`AFR`/`FFR` = actual/fixed funding = `realized`/`fixed`.)
+    returns the *unsigned* brink tx for the user to confirm. Agent proposes, user confirms.
+    (`AFR`/`FFR` = actual/fixed funding = `realized`/`fixed`.)
 
 ## Validation (already done)
 

@@ -50,11 +50,16 @@ Receives from swap:     + floating funding − fixed
 Net:                    − fixed   (constant, hedged)
 ```
 
-### The instrument
-**A funding-rate swap: variable → fixed, in one click.** You don't change the market's funding — you lock *yours*, like switching a variable mortgage to a fixed one. Two sides:
-- **Hedger** (an Ethena-like fund, any perp holder) — **pays fixed, receives floating** → their variable funding is cancelled out, leaving a flat, locked rate. Buys *certainty*. The primary customer.
-- **Speculator** (cofounder's spec calls this side *Volátil*, "the volatile side") — **receives floating, pays fixed** → bets funding stays high / rises; collects a premium for absorbing the risk. Buys *upside*.
-- It's **zero-sum** between the two: what one loses, the other gains, exactly. There is never a "nobody wins" period — always one payer and one receiver, mirrored.
+### The instrument & who's who
+**A funding-rate swap: variable → fixed, in one click.** You don't change the market's funding — you lock *yours*, like switching a variable mortgage to a fixed one. Three roles, but only **two are live in the MVP**:
+
+- **Hedger = the perp trader = the customer (the *taker*).** Holds a leveraged long on Hyperliquid, pays funding, hates the swings. On Keel they **pay fixed, receive floating** → their variable funding is cancelled, leaving a flat locked rate. They **take** a rate we offer, one click. The primary customer and the protagonist (the Ethena character).
+- **Keel LP = us = the rate-offerer (the *maker*).** We post **consistent fixed-rate offers** and stand as the counterparty, so a hedger can lock **instantly** without waiting for anyone to show up. We take the opposite leg — **receive fixed, pay floating** — so we earn the premium when funding stays below the locked rate and pay out (bounded per period by the cap) when it spikes. The *certainty-seller*.
+- **Speculator (*Volátil*) — deferred to phase 2, NOT built.** In the mature market, people who want to bet on funding take the LP's side and the LP only fills the gaps. **For now, we ARE the counterparty.**
+
+> **Leg direction (canonical, from the tested `KeelSwap`):** the hedger's net per period = `(realized − fixed) × notional` — they gain when funding is **high**, which offsets the high funding they pay on Hyperliquid. The LP is the exact mirror, `(fixed − realized) × notional` — gains when funding is **low**. *(Earlier drafts mislabeled both sides as "receives floating" — that was a bug; this is the correct, tested convention.)*
+
+**Cold-start is the real problem this solves.** A swap needs a counterparty, and at any moment there may be none. By making our **LP the always-on rate-offerer**, a hedger gets certainty on day one — the missing piece that turns the idea into a working product.
 
 ### Why leverage matters (the customer story)
 Funding is charged on **notional** but drains your **margin**. With leverage `L`, notional = margin × L, so:
@@ -64,20 +69,20 @@ Funding is charged on **notional** but drains your **margin**. With leverage `L`
 ```
 
 The margin cancels, leaving `L` as a multiplier. A funding spike that's a nuisance at 1× is a **liquidation at 10×**. The funding rate is the same for everyone regardless of leverage — leverage amplifies the *damage to margin*, not the rate. So the **leveraged long is the customer who needs this most**, and whom the swap protects most.
-- **Keel matches** the two sides and **custodies their collateral — no house position.** When the book is imbalanced, an **LP pool steps in as a *bounded* counterparty** (capped by the hourly clamp + pre-locked collateral) and earns the spread.
+- **The protocol itself stays neutral** — the Keel *contract* only custodies collateral and settles; it holds no position. The *liquidity* comes from our **LP** (bounded by the per-period cap + pre-locked collateral), exactly as an exchange is neutral while market-makers provide the quotes. In the demo we run that LP; in production it's many LPs + speculators.
 
-As long as funding keeps moving, both sides exist — one fears it falling, one bets it rising. **The core is deterministic — no AI in the settlement math, so no hallucination risk where money moves.** An optional agent layer (our MCP, §6) can read Hyperliquid and *operate* the swap, but it cannot *override* the one decision that matters: the collateral-low call is gated behind a human Ledger signature. **Agent proposes, human disposes.**
+**The core is deterministic — no AI in the settlement math, so no hallucination risk where money moves.** An optional agent layer (our MCP, §6) can read Hyperliquid and *operate* the swap, but it cannot *override* the one decision that matters: the collateral-low call is gated behind a human Ledger signature. **Agent proposes, human disposes.**
 
 ---
 
 ## 5. The mechanism (the core)
 - **The swap.** Each hour, the two legs exchange the **fixed-vs-realized-floating** difference from pre-locked collateral. The hedger's perp funding (floating) is offset by the floating leg they trade away → **net funding = the fixed rate. Locked.**
-- **The AMM (and the imbalance answer).** LPs quote the fixed rate off a utilization curve. **Matched fixed/floating flow nets peer-to-peer** (capital-efficient via Aqua virtual balances — the Aqua0 thesis: matched flow needs ~no capital). The LP pool absorbs the **net imbalance** and is paid the fee + spread + carry for it.
+- **Pricing & liquidity (the RFQ model).** Our **LP quotes a consistent fixed rate** (≈ expected funding + a small maker spread). A hedger **takes** that offer one-click — no waiting for a matching speculator — and signs it on a Ledger. Because we're the standing counterparty, liquidity is **instant**. *(Phase 2: when real speculators exist, matched hedger/speculator flow nets peer-to-peer via Aqua virtual balances — the Aqua0 thesis, matched flow needs ~no capital — and the LP only covers the residual.)*
 - **Why it survives a black swan — three locks:**
-  1. **Matcher + custodian, not a house position** — matched flow nets to zero; the protocol holds no directional bet of its own.
+  1. **The protocol is neutral; the LP's risk is bounded.** The Keel *contract* holds no position — it only custodies and settles. Our **LP** is the counterparty and *does* take directional risk, but it is **bounded**: per period it can never owe more than `cap × notional`, and that max is pre-locked up front.
   2. **Hourly settlement** — debt never accumulates; exposure resets every hour.
   3. **Funding is capped per hour (venue clamp) + collateral pre-locked to cover that max** → *the most anyone can owe in an hour is already paid up front → no default.* If a side runs out of collateral, **close only their side; the counterparty is still paid in full.**
-- **Honest residual risks (say them):** the **LP pool *does* take bounded imbalance risk** (managed/capped, not zero) — Voltz-style; **oracle staleness under congestion**; **correlated collateral.** Owning these makes you more credible.
+- **Honest residual risks (say them):** as the **primary LP we take bounded directional risk** (capped per period, not zero — we earn when funding stays calm, pay when it spikes) — Voltz-style; **oracle staleness under congestion**; **correlated collateral.** Owning these makes you more credible.
 - **Worked example.** Lock **10% APR**. Real funding → **0%**: you still receive 10% (counterparty covers the gap from pre-locked collateral). Real funding → **50%**: you still get 10%, counterparty keeps the surplus. Either way, **your rate didn't move.**
 
 ### The Ledger moment (the second core feature)
@@ -96,8 +101,8 @@ This is the deliberate anti-agent angle: **the decision that matters is made by 
 **The full flow:** Chainlink CRE reads BTC's real funding rate from **Hyperliquid** each period → writes it on-chain as a **funding index** → the swap contract on **1inch Aqua** reads that index, computes fixed-vs-floating, and transfers the difference between the two parties → settlement and payout in **USDC**. **Everything deploys on Hyperliquid testnet (HyperEVM)** — the same venue the funding rate comes from, so the oracle source and the settlement chain are one and the same.
 
 ```
- HEDGER ─lock fixed─┐                          ┌─ SPECULATOR / Volátil (take floating)
-                    ▼                          ▼
+ HEDGER (customer) ─takes our rate─┐          ┌─ KEEL LP (us) — offers the fixed rate
+                    ▼                          ▼   (speculators take this side in phase 2)
         KEEL — funding-rate swap on 1inch Aqua / SwapVM  (HyperEVM testnet)
         • matched flow nets via VIRTUAL BALANCES (collateral stays in wallet, alive)
         • custom SwapVM opcode = periodic settlement (a derivative, not a trade)
@@ -142,13 +147,13 @@ This is the reconciliation of "agent-operated" with "anti-agent": the protocol i
 - **`_fundingSettle(Context, bytes)`** — the one custom SwapVM instruction: reads the latched funding index + swap terms (fixed rate, notional, parties), computes the net cashflow `(realized − fixed) × notional` (capped at the hourly clamp), and `pull()/push()`es it from payer → receiver. Marks the period settled (no double-settle).
 - **`setFundingIndex(period, value)`** — storage latch written by the **CRE KeystoneForwarder** (`onlyForwarder`).
 - **Open / close** = ordinary swaps (pull collateral → mint position tokens / return collateral).
-- **MVP scope:** one *matched* swap (one hedger + one speculator) + `_fundingSettle` + the CRE index + a keeper firing hourly `settle()`. **That alone demos the thesis.** The **AMM/LP backstop for imbalance is phase 2** — mock/simplify it for the demo. Keep the **plain-Solidity settlement fallback** ready; don't claim the opcode runs until validated. *(SwapVM is atomic with no native scheduling → the hourly settle is keeper/CRE-triggered each period.)*
+- **MVP scope:** one swap between a **hedger (customer/taker)** and **our LP (maker/counterparty)** + the CRE index + a keeper firing `settle()` each period. The hedger takes our offered fixed rate via the MCP and signs on a Ledger. **That alone demos the thesis.** **Speculators and the `_fundingSettle` opcode are phase 2** — settle via the tested plain-Solidity `KeelSwap`. Keep the **plain-Solidity settlement fallback** ready; don't claim the opcode runs until validated. *(SwapVM is atomic with no native scheduling → the hourly settle is keeper/CRE-triggered each period.)*
 
 ### Settlement math (formal spec — reconciled with the shipped `KeelSwap`)
 Variables: `N` = notional (USDC, 1e6), `F` = fixed rate, `R` = realized floating rate for the period (from CRE), `cap` = max |R − F| per period (venue funding clamp), `Δt` = period length as a fraction of a year.
 
 - **Per-period net cashflow:** `payment = N × clamp(R − F, ±cap)` (the credit to the **hedger**). Equivalently, the hedger's *outflow* is `N × (F − R)`.
-  - **Direction (canonical, from the tested contract):** `R > F` → **hedger is credited, speculator pays**; `R < F` → **hedger pays, speculator is credited**. ⚠️ The cofounder's draft wrote *"F > R → Hedger receives,"* which contradicts the "hedger receives floating" definition; the shipped, unit-tested `KeelSwap` uses `net = realized − fixed` (hedger = floating receiver), and that is the source of truth.
+  - **Direction (canonical, from the tested contract):** `R > F` → **hedger is credited, the LP (counterparty) pays**; `R < F` → **hedger pays, the LP is credited**. (In `KeelSwap` the counterparty fills the `speculator` parameter slot — in the MVP that address is our LP.) ⚠️ The cofounder's draft wrote *"F > R → Hedger receives,"* which contradicts the "hedger receives floating" definition; the shipped, unit-tested `KeelSwap` uses `net = realized − fixed` (hedger = floating receiver), and that is the source of truth.
 - **No-default bound:** `maxPeriodAmount = cap × N` — the most that can move in one period. Each side pre-locks at least this (`collateral_min ≥ cap × N`; size to `cap × N × periods_buffered` for a multi-period buffer).
 - **Close trigger (→ Ledger):** close/decide when `remaining_collateral < cap × N` (can't cover one more worst-case period).
 - **Final PnL per side:** `Σ over settled periods of N × clamp(R_i − F, ±cap)` (sign per side).
@@ -161,9 +166,9 @@ Variables: `N` = notional (USDC, 1e6), `F` = fixed rate, `R` = realized floating
 ---
 
 ## 7. User flows
-- **Hedger:** pick venue + tenor → see live **floating** vs the quoted **fixed** → **Lock fixed** → watch real funding bounce while your rate stays flat → hourly settlement → close at maturity.
-- **Speculator:** **Go floating / bet funding up** → receive floating, pay fixed.
-- **LP:** deposit collateral → earn fee + spread + the carry on imbalance; risk is bounded by the hourly cap + pre-locked collateral.
+- **Hedger (customer / taker):** open Keel (UI or via the MCP) → see our **offered fixed rate** next to the live floating ticker → **Take / Lock** (sign the `approve` + `open` on a **Ledger**) → watch real funding bounce while your rate stays flat → per-period settlement in USDC → close at maturity.
+- **Keel LP (us / maker):** quote a **consistent fixed rate** (≈ E[funding] + spread), pre-fund collateral, stand as the counterparty so hedgers lock instantly; at a side's brink, sign the close / top-up on a **Ledger**.
+- **Speculator — phase 2 (not built):** take the LP's side to bet on funding; the LP then only covers the residual imbalance.
 
 ---
 
@@ -187,7 +192,7 @@ The required pieces (Aqua, CRE) are undeniably load-bearing — there's no "bolt
 **UI form — a focused *lock* UI, NOT a trading terminal.** No orderbook / depth / candlesticks (they misrepresent the matching/AMM model *and* bury the WOW, and you'd have to fake liquidity). Rates-desk *aesthetic*, one-click-lock *interaction*. Four surfaces: a **rates board** (markets → live floating + fixed quotes by tenor, the cheap "this is a market" view), a **lock card** (floating ticker vs fixed quote + Lock-fixed / Take-floating), a **position + hourly-settlement feed**, and the **hero comparison chart**. *(A paste-ready Claude Design prompt for this exists.)*
 
 **The product UI around it:**
-1. **Funding-market panel** — live, jumpy **floating ticker** next to the **AMM-quoted fixed rate**; **Lock fixed** / **Go floating** buttons (the two-sided market, visible).
+1. **Funding-market panel** — live, jumpy **floating ticker** next to our **LP's offered fixed rate**; one **Lock fixed (Take)** button (the customer takes our standing offer).
 2. **One-click lock** — *"Locked 10% APR, 30 days, $50k notional"* → a live strip showing real funding moving while your rate is flat.
 3. **Hourly settlement, live** — each period the swap settles in **real USDC on Hyperliquid testnet (HyperEVM)**; show the cashflow + pre-locked collateral → **"no default possible," shown not asserted.** (Demo compresses ~2 min/period so a multi-week hedge fits the slot — documented, not faked.)
 4. **The Ledger moment** — drive a side's collateral to the brink, then show Keel *pause* and surface the close / re-match / continue choice. A human picks up the **Ledger and signs** the decision live. "The decision that matters is made by a human, not an algorithm" — demonstrated, not asserted.

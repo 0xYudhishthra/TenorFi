@@ -17,23 +17,17 @@ interface IFundingIndex {
 ///         fixed-vs-realized-floating difference each settlement period. The protocol
 ///         holds no directional position — it only matches, custodies, and settles.
 ///
-/// @dev    This is the plain-Solidity settlement core: the source of truth that the
-///         `_fundingSettle` SwapVM opcode (M3) will later wrap. It deliberately avoids
-///         any Aqua / SwapVM dependency so it is correct and demoable on its own.
-///
-///         Units:
+/// @dev    Units:
 ///           - rates (fixedRate, cap, funding index): signed 1e18 fixed-point,
 ///             per-period fractional rates.
 ///           - notional & collateral: USDC, 6 decimals.
 ///           - per-period cashflow = clamp(realized - fixed, ±cap) * notional / 1e18.
 ///
-///         Leg convention (matches the task's netting formula):
+///         Leg convention:
 ///           - HEDGER receives floating, pays fixed:  net = (realized - fixed) * notional.
 ///           - SPECULATOR is the exact opposite:       net = (fixed - realized) * notional.
 ///         When realized > fixed the hedger is credited and the speculator is debited;
-///         when realized < fixed the flow reverses. (Doc §4/§5 are inconsistent on the
-///         marketing label for this leg; the math here is symmetric and the convention
-///         is fixed and explicit.)
+///         when realized < fixed the flow reverses. The convention is fixed and explicit.
 ///
 ///         No-default design (three structural guarantees):
 ///           1. Each period's settlement magnitude is clamped to `cap * notional` — the

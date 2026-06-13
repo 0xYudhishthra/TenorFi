@@ -8,8 +8,8 @@ interface IFundingIndex {
 }
 
 /// @notice Builds the args blob for the `_fundingSettle` instruction.
-/// @dev    abi.encode keeps the scaffold readable; total 160 bytes < 255 (the program's
-///         per-instruction args length is a single byte). Tighten with Calldata packing later.
+/// @dev    abi.encode keeps args readable; total 160 bytes < 255 (the program's per-instruction
+///         args length is a single byte).
 library FundingSettleArgsBuilder {
     function build(
         address fundingIndex,
@@ -22,15 +22,14 @@ library FundingSettleArgsBuilder {
     }
 }
 
-/// @title FundingSettle — a custom SwapVM instruction for funding-rate settlement
-/// @notice Turns a swap into one period's funding settlement: reads the latched funding rate
-///         (AFR) from CRE's on-chain index, nets it against the locked fixed rate (FFR), and
-///         writes the result to `ctx.swap.amountOut` so SwapVM's router delivers it from the
-///         payer (maker) to the receiver (taker). Same canonical math as `KeelSwap`
-///         (`net = realized − fixed`), expressed idiomatically as a SwapVM opcode.
-/// @dev    `period` is derived from `block.timestamp` so the maker's program is fixed (no
-///         per-period re-ship) and the taker cannot choose a favourable period. Mix this into a
-///         router via `_opcodes()` (see KeelSwapVMRouter).
+/// @title FundingSettle — a SwapVM instruction for funding-rate settlement
+/// @notice Settles one period of a funding-rate swap: reads the latched funding rate for the
+///         period from the on-chain funding index, nets it against the position's fixed rate,
+///         clamps to the per-period cap, and writes the net to `ctx.swap.amountOut` so the
+///         router delivers it from the payer (maker) to the receiver (taker).
+/// @dev    `period` is derived from `block.timestamp`, so the maker's program is fixed (no
+///         per-period re-ship) and the taker cannot choose a favourable period. Mixed into a
+///         router via `_opcodes()`.
 abstract contract FundingSettle {
     using ContextLib for Context;
 

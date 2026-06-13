@@ -8,18 +8,11 @@ interface IFundingIndex {
 }
 
 /// @title KeelFundingApp
-/// @notice Aqua-native funding-rate swap. The same settlement math as `KeelSwap`, but
-///         positions are backed by **Aqua virtual balances** (collateral stays live in
-///         each party's wallet) and each period's net cashflow is moved with a single
-///         Aqua `pull` — a one-token balance transfer between the two parties, NOT a
-///         tokenIn/tokenOut swap. This is the "sophisticated DeFi position" for the
-///         1inch Build-an-Aqua-App bounty.
+/// @notice Funding-rate swap backed by Aqua virtual balances: collateral stays live in each
+///         party's wallet, and each period's net cashflow is moved with a single Aqua `pull`
+///         — a one-token balance transfer between the two parties, not a tokenIn/tokenOut swap.
 ///
-/// @dev    ROUTE A (verified against github.com/1inch/aqua). Route B — porting this into
-///         a custom SwapVM bytecode instruction (the 1inch/swap-vm package) — is the "scored
-///         higher" stretch and wraps this same math.
-///
-///         Lifecycle:
+/// @dev    Lifecycle:
 ///           1. Each party `ship`s a USDC strategy to THIS app (collateral = a virtual
 ///              balance / allowance; tokens stay in their wallet). The hedger and the LP
 ///              each ship with `Strategy{maker, role, salt}` so the hashes are recomputable.
@@ -29,7 +22,7 @@ interface IFundingIndex {
 ///              netted difference from payer -> receiver. No double-settle.
 ///           4. `close()` lets each maker `dock` their strategy (off-chain / by the maker).
 ///
-///         Leg convention (canonical, matches the tested KeelSwap):
+///         Leg convention:
 ///           hedger net = (realized - fixed) * notional.  realized > fixed => hedger
 ///           receives (LP pays); realized < fixed => hedger pays (LP receives). "realized"
 ///           is the actual funding rate (AFR); "fixed" is the locked rate (FFR).

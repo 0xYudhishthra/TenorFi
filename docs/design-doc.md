@@ -37,7 +37,7 @@ TradFi solved this **40 years ago**: swap a variable rate for a fixed one — th
 ## 4. The solution
 
 ### The core insight (read this first — it's the part everyone gets confused on)
-**Keel does not touch any Hyperliquid position.** It does not intercept or capture the funding you pay/earn on a perp. It is a **separate contract between two parties that settles against a public number** — the BTC funding rate. The contract only needs to *read what funding was* (via Chainlink CRE), not *capture* it.
+**The Keel contract does not touch any Hyperliquid position.** It does not intercept or capture the funding you pay/earn on a perp. It is a **separate contract between two parties that settles against a public number** — the BTC funding rate. The contract only needs to *read what funding was* (via Chainlink CRE), not *capture* it. *(The optional MCP agent can **open and top up** your Hyperliquid leg on your behalf via API — see §6 — but the contract itself never does.)*
 
 > **Rain-insurance analogy.** A rain insurer doesn't control the weather or stand in your field — they pay you based on how much rain fell, measured by a public source. Keel pays based on what funding *was*, measured by CRE. **This is why we don't need to build our own perp DEX.**
 
@@ -125,16 +125,46 @@ This is the deliberate anti-agent angle: **the decision that matters is made by 
 
 **One line each:** **Aqua = the engine** (the table, collateral stays alive) · **CRE = the thermometer** (measures funding, puts it on-chain) · **Ledger = the hand on the lever** (signs the one decision that matters). *Pull any one and the product breaks — but Aqua is the one we push furthest.* Settlement currency is **USDC on HyperEVM**.
 
-### The agent layer (MCP) — agent proposes, human disposes
-A **Keel MCP server** lets an agent (Claude, or any MCP client) operate the protocol end-to-end: read live **Hyperliquid funding** + positions, fetch quotes, and take routine actions (open / monitor / settle a swap). The agent does the analysis and *prepares* the consequential decision — but at the brink (a side's collateral `< cap × notional`), the close / re-match / continue action is **handed to a human to sign on a Ledger**. The MCP never holds the key for that step.
+### The agent layer (MCP) — the one-click front door (agent proposes, human disposes)
+The **Keel MCP** is how a user enters in one conversation. The agent orchestrates **both legs** of the hedge on the user's behalf and gates the signature behind a Ledger.
 
-This is the reconciliation of "agent-operated" with "anti-agent": the protocol is fully driveable by an agent, yet the one transaction that moves real money at the edge is **physically gated behind a hardware signature**. It is both a slick demo surface (drive Keel live from Claude) *and* the strongest possible statement of the human-in-the-loop thesis — *agent proposes, human disposes.*
+**The conversation (illustrative):**
+> **User:** "Create a long on BTC on Hyperliquid and fix the funding rate."
+> **MCP:** "You have 3 fixed-rate positions to choose: 1) **5% fixed rate, $20k max coverage**; 2) … ; 3) …"
+> **User:** "I want the one at 5%."
+> **MCP:** "Okay — now sign on your Ledger."
 
-- **Read tools:** `get_funding(market)`, `get_positions(addr)`, `get_swap(id)`, `quote_fixed(notional, tenor)`.
-- **Write tools (routine):** `open_swap(...)`, `settle(swapId, period)`, `preview_settle(swapId, realized)`.
-- **Gated tool (brink):** `propose_decision(swapId)` returns the *unsigned* close / re-match / continue tx for a **Ledger** to sign — the agent surfaces the choice; the human commits it.
+The "3 fixed-rate positions" are **our LP's standing offers** — each is a `fixed rate` + a `max coverage` (where coverage = `cap × notional`, the most the insurance pays out). The user picks one and **signs the open on a Ledger**.
 
-*(Honest framing: keep the deterministic claim precise — there is no AI in the settlement math; the agent is an operating convenience on top, and the brink stays human. Don't let the MCP demo dilute "no hallucination where money moves.")*
+**Two legs, one click.** On that signature the MCP opens:
+1. **The Hyperliquid perp** — the user's actual leveraged long, via the **Hyperliquid testnet API**. *(The MCP acts on the user's behalf; the Keel **contract** never touches Hyperliquid — see §4 core insight.)*
+2. **The Keel position** — the fixed-rate swap against our LP (`KeelSwap.open`). The user's collateral is now locked in as insurance.
+
+**The settlement loop (each period, while the perp is open).** Let `AFR` = Actual Funding Rate (realized, from CRE) and `FFR` = Fixed Funding Rate (the locked rate):
+- **`AFR > FFR`** → funding is high and draining the perp's margin → **the protocol pays the user, and the MCP routes that payout into the Hyperliquid position's margin** (tops it up — the hedge in action).
+- **`AFR < FFR`** → funding is below the locked rate → **the premium flows from the user's Keel collateral into the LP/protocol pool** (the cost of certainty).
+
+This is the §4 algebraic cancellation made real: the Keel payout refills exactly the margin that high funding drains, so the user's **net funding cost stays pinned at the fixed rate.** (`AFR`/`FFR` map 1:1 to `realized`/`fixed` in `KeelSwap`; `AFR > FFR` ⇒ hedger credited — consistent with the tested contract.)
+
+```
+[Chat on MCP] ──► [MCP] ──┬──► Create Hyperliquid perp        (HL testnet API)
+  pick offer, sign Ledger └──► Create Keel position           (KeelSwap.open) → capital locked
+                                        │
+                     ┌──────────────────▼──── loop while perp open ─────────────────┐
+                     │  Is the HL position open? ── yes ──► AFR vs FFR?              │
+                     │      AFR > FFR → protocol pays user → top up HL margin        │
+                     │      AFR < FFR → premium from user  → protocol/LP pool        │
+                     └───────────────────────────────────────────────────────────────┘
+                                (at the brink: propose_decision → human signs on Ledger)
+```
+
+**Tool surface:**
+- **Read:** `get_funding(market)` (AFR via CRE), `list_offers()` (the LP's fixed-rate offers), `get_position(addr)`, `preview_settle(swapId, realized)`.
+- **Open (Ledger-signed):** `open_hyperliquid_position(market, side, size)` (HL testnet API) + `open_keel_position(offerId)` (`KeelSwap.open`).
+- **Settle (routine, keeper/agent):** `settle(swapId, period)` → on `AFR > FFR`, `topup_hyperliquid_margin(...)`.
+- **Gated (brink, Ledger-signed):** `propose_decision(swapId)` → the *unsigned* close / top-up / re-match tx for a Ledger to sign.
+
+**Neutrality stays honest:** the Keel *contract* still only reads the public funding number and settles — it never touches Hyperliquid. The *MCP* is the convenience layer that drives the user's own HL leg via API and mirrors payouts to it. There's no AI in the settlement math (no hallucination where money moves); the agent builds both txs, the **human signs on a Ledger.** *Agent proposes, human disposes.*
 
 ### Feasibility against the bounty stack (verified this session)
 - **1inch Aqua / SwapVM** — verified from the `1inch/aqua` + `swap-vm` repos (**the 1inch MCP is *not* live in this session — checked the source instead**). Virtual balances ✓ (collateral stays in-wallet). **CATCH:** SwapVM `swap()` is **atomic, no native hold/expiry** — so **periodic settlement cuts against SwapVM's design and is the hardest piece.** It works as a **keeper/CRE-triggered settlement swap each period** that calls the custom opcode against the latched funding index — feasible, not native. **Long pole. Keep a plain-Solidity settlement fallback; don't claim the opcode runs until validated.**

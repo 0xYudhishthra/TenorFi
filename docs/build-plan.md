@@ -66,10 +66,13 @@ Everything downstream builds on these (see design-doc §6 *Settlement math*):
 - [ ] **M6 — HyperEVM deploy + USDC settlement.** Deploy everything on Hyperliquid testnet
     (oracle source = settlement chain). Confirm EIP-1153 (transient storage); test USDC
     (canonical vs `MockUSDC`). USDC settlement on HyperEVM.
-- [ ] **M7 — Keel MCP (agent layer).** MCP server exposing read tools (`get_funding`,
-    `get_positions`, `get_swap`, `quote_fixed`) + routine write tools (`open_swap`, `settle`,
-    `preview_settle`) + a gated `propose_decision` that returns the *unsigned* brink tx for a
-    **Ledger** to sign. Agent proposes, human disposes; the MCP never holds the brink key.
+- [ ] **M7 — Keel MCP (agent layer, the one-click front door).** MCP server that orchestrates
+    **both legs** in one conversation: `list_offers` (the LP's fixed-rate offers, e.g. "5% /
+    $20k coverage") → on a **Ledger** signature, `open_hyperliquid_position` (HL testnet API)
+    **+** `open_keel_position` (`KeelSwap.open`). Per period: `settle` → on `AFR > FFR`,
+    `topup_hyperliquid_margin` (route the payout to the perp's margin). Gated `propose_decision`
+    returns the *unsigned* brink tx for the Ledger. Agent proposes, human disposes; the MCP
+    never holds a signing key. (`AFR`/`FFR` = actual/fixed funding = `realized`/`fixed`.)
 
 ## Validation (already done)
 

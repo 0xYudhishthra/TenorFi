@@ -1,0 +1,31 @@
+# --- secrets (NEVER commit) ---
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.keystore
+keystore/
+secrets/
+
+# --- node ---
+node_modules/
+.pnpm-store/
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+
+# --- foundry ---
+packages/contracts/out/
+packages/contracts/cache/
+packages/contracts/broadcast/
+!packages/contracts/broadcast/**/dry-run/
+
+# --- misc ---
+.DS_Store
+*.log
+coverage/
+.idea/
+.vscode/

@@ -29,3 +29,4 @@ packages/contracts/broadcast/
 coverage/
 .idea/
 .vscode/
+.claude/

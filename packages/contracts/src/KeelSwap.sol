@@ -62,6 +62,8 @@ contract KeelSwap {
     mapping(uint256 => Swap) public swaps;
     /// @notice swapId => period => settled (no-double-settle guard).
     mapping(uint256 => mapping(uint256 => bool)) public settled;
+    /// @notice Collateral credited on close, withdrawable by each party (pull-over-push).
+    mapping(address => uint256) public claimable;
 
     event SwapOpened(
         uint256 indexed swapId,
@@ -103,6 +105,7 @@ contract KeelSwap {
     error FundingNotSet();
     error SwapClosedError();
     error NotParticipant();
+    error NothingToWithdraw();
 
     constructor(address collateralToken_, address fundingIndex_) {
         if (collateralToken_ == address(0) || fundingIndex_ == address(0)) revert ZeroAddress();
@@ -140,6 +143,8 @@ contract KeelSwap {
         if (endPeriod < startPeriod) revert BadPeriodRange();
 
         uint256 minCollateral = maxPeriodAmount(cap, notional);
+        // Reject dust swaps where cap*notional rounds to 0 — otherwise the no-default floor vanishes.
+        if (minCollateral == 0) revert InsufficientCollateral();
         if (hedgerCollateral < minCollateral || speculatorCollateral < minCollateral) {
             revert InsufficientCollateral();
         }
@@ -229,6 +234,10 @@ contract KeelSwap {
         Swap storage s = swaps[swapId];
         if (s.closed) revert SwapClosedError();
         if (msg.sender != s.hedger && msg.sender != s.speculator) revert NotParticipant();
+        // Note: settlement is permissionless, so the counterparty can settle any latched period
+        // before a close; closing early only forfeits future, un-latched periods (normal early exit).
+        // A guard requiring all latched periods settled would break the no-default path where a
+        // drained side's period cannot be settled at all.
 
         s.closed = true;
         uint256 hedgerPayout = s.hedgerCollateral;
@@ -236,10 +245,20 @@ contract KeelSwap {
         s.hedgerCollateral = 0;
         s.speculatorCollateral = 0;
 
-        if (hedgerPayout > 0) _push(s.hedger, hedgerPayout);
-        if (speculatorPayout > 0) _push(s.speculator, speculatorPayout);
+        // Pull-over-push: credit each side, who withdraws independently. A blacklisted/ reverting
+        // recipient can no longer block the counterparty's redemption.
+        if (hedgerPayout > 0) claimable[s.hedger] += hedgerPayout;
+        if (speculatorPayout > 0) claimable[s.speculator] += speculatorPayout;
 
         emit SwapClosed(swapId, hedgerPayout, speculatorPayout);
+    }
+
+    /// @notice Withdraw collateral credited to you on close.
+    function withdraw() external {
+        uint256 amount = claimable[msg.sender];
+        if (amount == 0) revert NothingToWithdraw();
+        claimable[msg.sender] = 0;
+        _push(msg.sender, amount);
     }
 
     // --- views ---

@@ -53,6 +53,7 @@ contract FundingIndex {
 
     /// @notice Rotate the authorized forwarder (e.g. when the CRE workflow is redeployed).
     function setForwarder(address newForwarder) external onlyOwner {
+        if (newForwarder == address(0)) revert ZeroAddress(); // never brick the write path
         emit ForwarderUpdated(forwarder, newForwarder);
         forwarder = newForwarder;
     }

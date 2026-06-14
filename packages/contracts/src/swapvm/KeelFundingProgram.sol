@@ -20,18 +20,25 @@ contract KeelFundingProgram is KeelOpcodes {
 
     constructor(address aqua) KeelOpcodes(aqua) {}
 
+    /// @param maker         The payer for this leg (LP for the maker-pays-above leg; hedger for the mirror).
+    /// @param counterparty  The only address allowed to take this order (the receiver of this leg).
+    /// @param makerPaysAbove true: maker pays when realized > fixed; false: when realized < fixed.
     function buildProgram(
         address maker,
         address fundingIndex,
         int256 fixedRate,
         uint256 cap,
         uint256 notional,
-        uint256 periodSeconds
+        uint256 periodSeconds,
+        address counterparty,
+        bool makerPaysAbove
     ) external pure returns (ISwapVM.Order memory) {
         Program memory program = ProgramBuilder.init(_opcodes());
         bytes memory bytecode = program.build(
             _fundingSettle,
-            FundingSettleArgsBuilder.build(fundingIndex, fixedRate, cap, notional, periodSeconds)
+            FundingSettleArgsBuilder.build(
+                fundingIndex, fixedRate, cap, notional, periodSeconds, counterparty, makerPaysAbove
+            )
         );
 
         return MakerTraitsLib.build(

@@ -186,10 +186,12 @@ contract KeelSwapTest is Test {
         vm.expectRevert(KeelSwap.InsufficientCollateral.selector);
         keel.settle(id, START + 1);
 
-        // The solvent hedger withdraws everything credited — paid in full.
+        // The solvent hedger withdraws everything credited — paid in full (pull-over-push).
         uint256 hedgerBalBefore = usdc.balanceOf(hedger);
         vm.prank(hedger);
         keel.close(id);
+        vm.prank(hedger);
+        keel.withdraw();
         assertEq(usdc.balanceOf(hedger), hedgerBalBefore + 2 * MAX_PERIOD);
     }
 
@@ -231,6 +233,12 @@ contract KeelSwapTest is Test {
 
         vm.prank(speculator);
         keel.close(id);
+
+        // pull-over-push: each party withdraws their credited balance independently
+        vm.prank(hedger);
+        keel.withdraw();
+        vm.prank(speculator);
+        keel.withdraw();
 
         assertEq(usdc.balanceOf(hedger), hBefore + 10_100e6);
         assertEq(usdc.balanceOf(speculator), sBefore + 9_900e6);

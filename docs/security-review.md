@@ -38,6 +38,24 @@ Chain: **Base mainnet** (chain id 8453).
 - **Protocol neutrality:** the contracts only custody + settle; the LP provides liquidity and bears the
   bounded directional risk.
 
+## Deep audit pass (solidity-auditor, 4 vector agents + adversarial) — findings & resolutions
+
+A second, adversarial pass surfaced two protocol-logic bugs in the SwapVM path that Slither and the
+happy-path fork test missed. All actionable findings are now fixed; tests added for each.
+
+| # | Sev | Finding | Resolution |
+|---|---|---|---|
+| A | High | **Any address could take the settlement order and steal the LP's payout** (order not bound to the counterparty) | **Fixed** — `_fundingSettle` binds the order to a `counterparty` and reverts `UnauthorizedTaker` if `ctx.query.taker != counterparty`. Test: `test_strangerCannotTake`. |
+| B | High | **Opcode dropped the sign of `R − F`** → maker paid in both directions / drainable | **Fixed** — settlement is now directional: each leg has `makerPaysAbove`; an order pays only in its own direction (0 otherwise). A Keel position is two mirror orders. Tests: `test_wrongDirection_paysZero`, `test_makerPaysBelow_RBelowF_pays`. |
+| 1 | Med-High | **USDC blacklisting locks all collateral in `close()`** | **Fixed** — pull-over-push: `close()` credits `claimable[party]`; each party `withdraw()`s independently. |
+| 4 | Med | **Early `close()` skips unsettled periods** | **Acknowledged / by-design** — settlement is permissionless, so the counterparty can settle any *latched* period before a close; early close only forfeits future *un-latched* periods (normal early termination). A settle-before-close guard was tried and reverted because it breaks the no-default path (a drained side's period cannot be settled). |
+| 5 | Med | **`open()` pulls counterparty's full approval into unagreed terms** | **Partially mitigated** (participant guard); residual documented above — the consent-safe path is the Aqua opcode (now also taker-bound). |
+| 6 | Low | **Dust notional → zero min-collateral** | **Fixed** — `open()` reverts when `maxPeriodAmount == 0`. |
+| 7 | Low | **`setForwarder(0)` bricks funding writes** | **Fixed** — zero-address check added. |
+| 8 | Low | **Bare `require` on transfer (non-standard ERC20)** | **Accepted** — Base USDC returns `bool`; `SafeERC20` is a nice-to-have, not required for the chosen collateral. |
+
+**Test count after fixes: 50** (48 offline + 2 Base-mainnet fork). New: directional settlement, taker-bind, stranger-cannot-take, pull-over-push withdraw.
+
 ## Known limitations / out of scope
 - **KeelSwap counterparty-allowance consent** (see the Medium above) — use the Aqua opcode path in production.
 - **Oracle staleness / liveness** — if CRE/relayer stops writing, settlement halts for that period (funds safe; not lost). The receiver's relayer fallback mitigates liveness.

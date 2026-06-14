@@ -39,7 +39,14 @@ contract DeployTest is Test {
         // the program builder produces a non-empty funding-settlement order
         ISwapVM.Order memory order = d.program
             .buildProgram(
-                address(0xBEEF), address(d.fundingIndex), int256(1e16), 4e16, 50_000e6, 120
+                address(0xBEEF),
+                address(d.fundingIndex),
+                int256(1e16),
+                4e16,
+                50_000e6,
+                120,
+                address(0xCAFE),
+                true
             );
         assertEq(order.maker, address(0xBEEF));
         assertGt(order.data.length, 0, "program bytecode");

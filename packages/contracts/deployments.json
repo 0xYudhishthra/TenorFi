@@ -1,0 +1,8 @@
+{
+  "FundingIndex": "0x545f162204A92CEbeb12AA0A4AaDF777d6905005",
+  "KeelFundingReceiver": "0x7b7Ca2269f865C3448015173D433CcD7782aF582",
+  "KeystoneForwarder": "0x5E342a8438B4f5d39e72875FCee6f76B39CCE548",
+  "MockUSDC": "0x3A515ADf6a5Ee9c2cD906f7523B7F8485144c6e8",
+  "chainId": 8453,
+  "periodSeconds": 3600
+}

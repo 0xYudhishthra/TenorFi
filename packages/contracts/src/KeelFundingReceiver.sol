@@ -18,14 +18,17 @@ contract KeelFundingReceiver is IReceiver {
     FundingIndex public immutable fundingIndex;
 
     /// @notice The CRE KeystoneForwarder authorized to deliver DON reports.
-    address public immutable forwarder;
+    /// @dev    Rotatable so the same deployment can switch from the simulation MockForwarder to
+    ///         the production KeystoneForwarder without a redeploy (see Chainlink ReceiverTemplate).
+    address public forwarder;
 
-    /// @notice Owner that can rotate the relayer fallback address.
+    /// @notice Owner that can rotate the forwarder + relayer fallback address.
     address public owner;
 
     /// @notice Optional EOA fallback allowed to post reports when the DON is unavailable.
     address public relayer;
 
+    event ForwarderUpdated(address indexed previousForwarder, address indexed newForwarder);
     event RelayerUpdated(address indexed previousRelayer, address indexed newRelayer);
     event OwnerUpdated(address indexed previousOwner, address indexed newOwner);
     event ReportProcessed(uint256 indexed period, int256 value, address indexed caller);
@@ -50,7 +53,15 @@ contract KeelFundingReceiver is IReceiver {
         owner = msg.sender;
         relayer = relayer_;
         emit OwnerUpdated(address(0), msg.sender);
+        emit ForwarderUpdated(address(0), forwarder_);
         emit RelayerUpdated(address(0), relayer_);
+    }
+
+    /// @notice Rotate the authorized KeystoneForwarder (e.g. simulation Mock -> production).
+    function setForwarder(address newForwarder) external onlyOwner {
+        if (newForwarder == address(0)) revert ZeroAddress();
+        emit ForwarderUpdated(forwarder, newForwarder);
+        forwarder = newForwarder;
     }
 
     /// @notice Rotate the EOA fallback (set to the zero address to disable it).

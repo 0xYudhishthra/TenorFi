@@ -48,9 +48,11 @@ contract Deploy is Script {
         d.aqua = aqua == address(0) ? address(new Aqua()) : aqua;
         d.usdc = usdc == address(0) ? address(new MockUSDC()) : usdc;
 
-        // Latch is deployed with the deployer as a temporary forwarder, then re-pointed at the
+        // Latch is deployed with the caller as a temporary forwarder, then re-pointed at the
         // canonical CRE receiver (resolves the receiver <-> index construction cycle).
-        d.fundingIndex = new FundingIndex(address(this));
+        // `msg.sender` (not `address(this)`, which Foundry forbids in scripts) owns the index so
+        // the setForwarder call below is authorized.
+        d.fundingIndex = new FundingIndex(msg.sender);
         d.receiver = new KeelFundingReceiver(d.fundingIndex, forwarder, relayer);
         d.fundingIndex.setForwarder(address(d.receiver));
 

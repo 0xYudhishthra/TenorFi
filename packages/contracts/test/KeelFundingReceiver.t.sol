@@ -122,6 +122,32 @@ contract KeelFundingReceiverTest is Test {
         receiver.setRelayer(stranger);
     }
 
+    function test_setForwarder_onlyOwnerAndRotates() public {
+        address newForwarder = makeAddr("newForwarder");
+        receiver.setForwarder(newForwarder);
+        assertEq(receiver.forwarder(), newForwarder);
+
+        // Old forwarder can no longer write.
+        vm.prank(forwarder);
+        vm.expectRevert(KeelFundingReceiver.NotAuthorized.selector);
+        receiver.onReport("", _report(9, 1));
+
+        // New forwarder can.
+        vm.prank(newForwarder);
+        receiver.onReport("", _report(9, 77));
+        (int256 v,) = idx.getFundingIndex(9);
+        assertEq(v, 77);
+    }
+
+    function test_setForwarder_revertsForZeroAndNonOwner() public {
+        vm.expectRevert(KeelFundingReceiver.ZeroAddress.selector);
+        receiver.setForwarder(address(0));
+
+        vm.prank(stranger);
+        vm.expectRevert(KeelFundingReceiver.NotOwner.selector);
+        receiver.setForwarder(stranger);
+    }
+
     function test_setOwner_rotates() public {
         address newOwner = makeAddr("newOwner");
         receiver.setOwner(newOwner);

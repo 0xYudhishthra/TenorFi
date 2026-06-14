@@ -1,0 +1,6 @@
+*.env
+
+# CRE build artifacts
+.cre_build_tmp.js
+*.wasm
+dist/

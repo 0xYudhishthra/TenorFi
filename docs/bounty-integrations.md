@@ -147,11 +147,14 @@ system — the **`_fundingSettle` opcode** (the settlement path, over Aqua) and 
 API (Hyperliquid) ✓ · a successful CRE CLI simulation qualifies (they deploy it live for you) — land
 **≥1 real on-chain write** ✓ · makes an on-chain state change (not a UI read) ✓.
 
-**Build steps (Axel).** (1) Base mainnet RPC + confirm CRE supports Base mainnet and its
-KeystoneForwarder address; get the deployed `KeelFundingReceiver` + `FundingIndex` from
-`deployments.json`. (2) Write the workflow: HTTP fetch HL BTC funding → DON consensus → convert
+**Build steps (Axel).** (1) Base mainnet RPC; CRE on Base mainnet is confirmed — chain name
+`ethereum-mainnet-base-1`, selector `15971525489660198786`, production KeystoneForwarder
+`0xF8344CFd5c43616a4366C34E3EEE75af79a74482` (simulation MockForwarder
+`0x5e342a8438b4f5d39e72875fcee6f76b39cce548`). Get the deployed `KeelFundingReceiver` + `FundingIndex`
+from `deployments.json`. (2) Write the workflow: HTTP fetch HL BTC funding → DON consensus → convert
 annualized→per-period → encode `(period, value)` → `writeReport` targeting the receiver. (3) Simulate
-via CRE CLI. (4) Land one real on-chain write; hand the tx hash to the submission.
+via CRE CLI (deploy/rotate the receiver's forwarder to the MockForwarder, then `setForwarder()` back to
+production). (4) Land one real on-chain write; hand the tx hash to the submission.
 
 **Fallback.** If the DON is flaky by the checkpoint, the authorized **EOA relayer** calls
 `KeelFundingReceiver.onReport` with the real API-derived per-period index for the live loop — same

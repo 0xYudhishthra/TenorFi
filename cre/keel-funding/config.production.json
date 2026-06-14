@@ -1,0 +1,12 @@
+{
+  "schedule": "0 */1 * * * *",
+  "apiUrl": "https://api.hyperliquid.xyz/info",
+  "coin": "BTC",
+  "periodSeconds": 3600,
+  "evm": {
+    "receiverAddress": "0x7b7Ca2269f865C3448015173D433CcD7782aF582",
+    "chainSelectorName": "ethereum-mainnet-base-1",
+    "isTestnet": false,
+    "gasLimit": "500000"
+  }
+}

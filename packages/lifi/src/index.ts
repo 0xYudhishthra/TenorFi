@@ -15,3 +15,4 @@ export * from "./deposit.js";
 export * from "./open.js";
 export * from "./hedge.js";
 export * from "./execute.js";
+export * from "./status.js";

@@ -3,7 +3,7 @@
 
 import { serve } from "@hono/node-server";
 import { createTransport } from "@keel/hyperliquid";
-import { CHAINS } from "@keel/lifi";
+import { CHAINS, getBridgeStatus } from "@keel/lifi";
 import { loadConfig } from "./config.js";
 import { createDb } from "./core/repos/db.js";
 import { createPositionRepo } from "./core/repos/positions.js";
@@ -15,6 +15,13 @@ import { createSettleService } from "./core/services/settle.js";
 import { createRebalanceService } from "./core/services/rebalance.js";
 import { createExecutionService } from "./core/services/execution.js";
 import { createApp } from "./http/app.js";
+import {
+  startWorkers,
+  createFundingPoller,
+  createBridgeWatcher,
+  createRebalanceMonitor,
+  createSettlementScheduler,
+} from "./workers/index.js";
 
 const config = loadConfig();
 
@@ -42,3 +49,17 @@ const app = createApp({
 serve({ fetch: app.fetch, port: config.PORT }, (info) => {
   console.log(`keel-api listening on :${info.port} (${config.HL_NETWORK})`);
 });
+
+// Background workers: the automatic brain. Signing stays on the execution node.
+startWorkers([
+  createFundingPoller({ funding, markets: ["BTC"] }),
+  createBridgeWatcher({ positions, status: getBridgeStatus }),
+  createRebalanceMonitor({
+    positions,
+    rebalance,
+    execution,
+    thresholdUsd: 0, // 0 → never auto-triggers until tuned per deployment
+    targetUsd: 0,
+  }),
+  createSettlementScheduler({ positions, periodMs: 60 * 60 * 1000 }),
+]);

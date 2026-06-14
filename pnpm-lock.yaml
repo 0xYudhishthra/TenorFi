@@ -29,6 +29,25 @@ importers:
         specifier: ^6.0.3
         version: 6.0.3
 
+  packages/lifi:
+    dependencies:
+      '@lifi/sdk':
+        specifier: ^4.0.0
+        version: 4.0.0
+      viem:
+        specifier: ^2.52.2
+        version: 2.52.2(typescript@6.0.3)
+    devDependencies:
+      '@types/node':
+        specifier: ^25.9.3
+        version: 25.9.3
+      tsx:
+        specifier: ^4.22.4
+        version: 4.22.4
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+
   packages/swapvm:
     dependencies:
       '@1inch/aqua':
@@ -583,6 +602,12 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.9':
     resolution: {integrity: sha512-3Belt6tdc8bPgAtbcmdtNJlirVoTmEb5e2gC94PnkwEW9jI6CAHUeoG85tjWP5WquqfavoMtMwiG4P926ZKKuQ==}
+
+  '@lifi/sdk@4.0.0':
+    resolution: {integrity: sha512-4xhwdc1cDgNv99slKG31dKzCPmZmJJFaxO4nayxIsaggeBZnG2VIie2x+cMS882fslKXGKMaoXGkP76/havwEA==}
+
+  '@lifi/types@17.82.1':
+    resolution: {integrity: sha512-n1FDyQtREj8RO/6XTeC1B2fq39t3CUlm7b+TeiMKQ6pLRpovwAZFhhv7dZIuAqr9FJvXc3cKVciyrR3L5IthmQ==}
 
   '@metamask/abi-utils@2.0.4':
     resolution: {integrity: sha512-StnIgUB75x7a7AgUhiaUZDpCsqGp7VkNnZh2XivXkJ6mPkE83U8ARGQj5MbRis7VJY8BC5V1AbB1fjdh0hupPQ==}
@@ -3762,6 +3787,12 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
+
+  '@lifi/sdk@4.0.0':
+    dependencies:
+      '@lifi/types': 17.82.1
+
+  '@lifi/types@17.82.1': {}
 
   '@metamask/abi-utils@2.0.4':
     dependencies:

@@ -14,7 +14,7 @@ import {
   fmtPct,
   ago,
   type Position,
-} from "@/lib/keel-data";
+} from "@/lib/tenorfi-data";
 
 type SortKey = "id" | "notional" | "fixedRate" | "status" | "startedAt";
 const KIND_LABEL: Record<string, string> = {

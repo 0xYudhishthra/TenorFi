@@ -35,7 +35,7 @@ export default function HeroA() {
             funding rate.
           </h1>
           <p className="lead sub">
-            Perp funding swings every hour. Keel turns your <em className="clay">variable</em>{" "}
+            Perp funding swings every hour. TenorFi turns your <em className="clay">variable</em>{" "}
             rate into a <em className="flat">fixed</em> one — in one conversation. Your
             collateral never goes idle.
           </p>

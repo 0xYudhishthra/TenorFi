@@ -7,7 +7,7 @@ import {
   fmtUSDfull,
   fmtPct,
   ago,
-} from "@/lib/keel-data";
+} from "@/lib/tenorfi-data";
 
 export function generateStaticParams() {
   return POSITIONS.map((p) => ({ swapId: String(p.id) }));

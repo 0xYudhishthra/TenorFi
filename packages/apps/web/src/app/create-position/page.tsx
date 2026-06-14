@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { OFFERS, fmtPct, fmtUSD, fmtUSDfull, type Offer } from "@/lib/keel-data";
+import { OFFERS, fmtPct, fmtUSD, fmtUSDfull, type Offer } from "@/lib/tenorfi-data";
 
 const CAP = 0.04; // per-period funding clamp → pre-locked collateral = cap × notional
 const commas = (n: number) => n.toLocaleString("en-US");
@@ -99,7 +99,7 @@ export default function CreatePositionPage() {
             <section className="step-card card">
               <h2>Your perp position</h2>
               <p className="hint">
-                The leg you want to protect from funding swings. Keel cancels its variable
+                The leg you want to protect from funding swings. TenorFi cancels its variable
                 funding and pins it to a fixed rate.
               </p>
 
@@ -180,7 +180,7 @@ export default function CreatePositionPage() {
             <section className="step-card card">
               <h2>Pick a fixed-rate offer</h2>
               <p className="hint">
-                Standing quotes from Keel LPs. Each is a <b>fixed rate</b> plus a{" "}
+                Standing quotes from TenorFi LPs. Each is a <b>fixed rate</b> plus a{" "}
                 <b>max coverage</b> — the most the position pays out, pre-funded so no
                 default is possible.
               </p>
@@ -235,7 +235,7 @@ export default function CreatePositionPage() {
               <h2>Review &amp; confirm</h2>
               <p className="hint">
                 One signature opens both legs. LI.FI Composer brings your USDC cross-chain
-                and deposits into the Hyperliquid perp and the Keel position together.
+                and deposits into the Hyperliquid perp and the TenorFi position together.
               </p>
               <div className="rev">
                 {[
@@ -261,7 +261,7 @@ export default function CreatePositionPage() {
                   <div className="d">Collateral deposited via LI.FI; the agent places the order.</div>
                 </div>
                 <div className="leg">
-                  <div className="t">② Keel position</div>
+                  <div className="t">② TenorFi position</div>
                   <div className="d">Your collateral ships into Aqua as a live virtual balance.</div>
                 </div>
               </div>

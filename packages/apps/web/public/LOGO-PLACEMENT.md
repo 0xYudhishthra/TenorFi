@@ -4,13 +4,13 @@
 
 ### ✅ Installed Logo Files
 
-1. **Main Logo (SVG)** - `keel-logo.svg` ✅
+1. **Main Logo (SVG)** - `tenorfi-logo.svg` ✅
    - Blue heartbeat/waveform with padlock icon
    - Transparent background
    - Scalable vector format
    - Used in: Header, Footer
 
-2. **Main Logo (PNG)** - `keel_logo.png` ✅
+2. **Main Logo (PNG)** - `tenorfi_logo.png` ✅
    - Blue color with transparent background
    - Fallback format
 
@@ -25,7 +25,7 @@
 - **File:** `icon.svg`
   - Size: SVG (scalable)
   - Usage: Modern browsers (Next.js App Router convention)
-  - **Suggestion:** Use `keel-logo.svg` as base
+  - **Suggestion:** Use `tenorfi-logo.svg` as base
 
 - **File:** `apple-icon.png` (Optional)
   - Size: 180x180px
@@ -35,7 +35,7 @@
 - **File:** `og-image.png`
 - **Size:** 1200x630px
 - **Usage:** Social media sharing (Twitter, LinkedIn, Discord, etc.)
-- **Content:** Should include Keel logo + tagline "Lock Your Funding Rate"
+- **Content:** Should include TenorFi logo + tagline "Lock Your Funding Rate"
 
 ## Where Logos Are Used
 
@@ -43,8 +43,8 @@
 ```tsx
 <motion.div whileHover={{ scale: 1.05 }}>
   <Image
-    src="/keel-logo.svg"  // ✅ Blue Keel logo
-    alt="Keel"
+    src="/tenorfi-logo.svg"  // ✅ Blue TenorFi logo
+    alt="TenorFi"
     width={32}
     height={32}
     className="w-8 h-8"
@@ -56,8 +56,8 @@
 ```tsx
 <motion.div whileHover={{ scale: 1.05 }}>
   <Image
-    src="/keel-logo.svg"  // ✅ Blue Keel logo
-    alt="Keel"
+    src="/tenorfi-logo.svg"  // ✅ Blue TenorFi logo
+    alt="TenorFi"
     width={28}
     height={28}
     className="w-7 h-7"
@@ -74,17 +74,17 @@ openGraph: {
 
 ## Quick Setup Checklist
 
-- [x] ✅ Add `keel-logo.svg` to `/public/`
-- [x] ✅ Add `keel_logo.png` to `/public/`
+- [x] ✅ Add `tenorfi-logo.svg` to `/public/`
+- [x] ✅ Add `tenorfi_logo.png` to `/public/`
 - [ ] 🔴 Add `favicon.ico` to `/public/` (optional - for old browsers)
 - [x] ✅ Add `icon.svg` to `/public/` (auto-generated from logo)
-- [ ] 🔴 Replace placeholder SVG with actual blue Keel logo
+- [ ] 🔴 Replace placeholder SVG with actual blue TenorFi logo
 - [ ] 🔴 Add `og-image.png` to `/public/` (1200x630px)
 - [ ] 🔴 (Optional) Add `apple-icon.png` to `/public/` (180x180px)
 
 ## Logo Details
 
-**Blue Keel Logo:**
+**Blue TenorFi Logo:**
 - Design: Heartbeat/waveform + padlock icon
 - Color: Blue (#3b82f6 primary blue)
 - Background: Transparent
@@ -96,5 +96,5 @@ openGraph: {
 - ✅ Logo works perfectly on dark maritime background
 - ✅ SVG provides crisp display at all sizes
 - ✅ Logo includes hover animation (scale on hover)
-- 🔴 Create favicon using the Keel logo icon
-- 🔴 Create OG image: Blue Keel logo + "Lock Your Funding Rate" tagline + maritime background
+- 🔴 Create favicon using the TenorFi logo icon
+- 🔴 Create OG image: Blue TenorFi logo + "Lock Your Funding Rate" tagline + maritime background

@@ -3,12 +3,12 @@
 import { useState } from "react";
 import Reveal from "./Reveal";
 
-const CLI_SNIPPET = `claude mcp add keel -- \\
+const CLI_SNIPPET = `claude mcp add tenorfi -- \\
   node packages/mcp/dist/index.js`;
 
 const JSON_SNIPPET = `{
   "mcpServers": {
-    "keel": {
+    "tenorfi": {
       "command": "node",
       "args": ["packages/mcp/dist/index.js"]
     }
@@ -29,7 +29,7 @@ const METHODS = [
     label: "Open · you sign",
     tools: [
       ["open_hyperliquid_position", "the perp leg, via the Hyperliquid API"],
-      ["open_keel_position", "ship the swap leg into 1inch Aqua"],
+      ["open_tenorfi_position", "ship the swap leg into 1inch Aqua"],
     ],
   },
   {
@@ -60,11 +60,11 @@ const FAQ = [
   },
   {
     q: "Which clients can connect?",
-    a: "Anything that speaks MCP — Claude Code, Claude Desktop, Cursor, Cline, Codex. The Keel server runs locally over stdio, so your keys and signatures never leave your machine.",
+    a: "Anything that speaks MCP — Claude Code, Claude Desktop, Cursor, Cline, Codex. The TenorFi server runs locally over stdio, so your keys and signatures never leave your machine.",
   },
   {
     q: "What can it read vs. write?",
-    a: "Reads are free and unsigned (get_funding, list_offers, get_position, preview_settle). Opening both legs and the brink decision are user-signed; the per-period settle is a routine keeper/CRE-triggered call over KeelSwapVMRouter.",
+    a: "Reads are free and unsigned (get_funding, list_offers, get_position, preview_settle). Opening both legs and the brink decision are user-signed; the per-period settle is a routine keeper/CRE-triggered call over TenorFiSwapVMRouter.",
   },
   {
     q: "Can I trust the funding number it settles on?",
@@ -96,10 +96,10 @@ export default function Mcp() {
           <div className="shead">
             <span className="eyebrow">Developers · Model Context Protocol</span>
             <h2 className="display">
-              Drive Keel from <em className="flat">your agent.</em>
+              Drive TenorFi from <em className="flat">your agent.</em>
             </h2>
             <p className="lead" style={{ marginTop: 18, maxWidth: "54ch" }}>
-              The <b>Keel MCP</b> is the front door. Point any MCP client — Claude,
+              The <b>TenorFi MCP</b> is the front door. Point any MCP client — Claude,
               Cursor, Cline — at it, and you lock a funding rate in one conversation.
               The agent reads funding, lists offers and builds both legs of the hedge;
               the signature that moves money is always yours.{" "}
@@ -115,7 +115,7 @@ export default function Mcp() {
               className="ticket-glow"
               style={{ inset: "auto auto -60% -30%", width: "70%", height: "120%" }}
             />
-            <div className="k">MCP server · Keel</div>
+            <div className="k">MCP server · TenorFi</div>
             <div className="url">node packages/mcp/dist/index.js</div>
             <div className="mcp-tags">
               <span className="mcp-tag">

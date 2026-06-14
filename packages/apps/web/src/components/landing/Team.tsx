@@ -19,7 +19,7 @@ export default function Team() {
         <Reveal>
           <div className="shead">
             <span className="eyebrow">Team</span>
-            <h2 className="display">The people behind Keel.</h2>
+            <h2 className="display">The people behind TenorFi.</h2>
           </div>
         </Reveal>
 

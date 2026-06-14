@@ -11,14 +11,14 @@ export default function Footer() {
             style={{ fontSize: 20, display: "inline-flex", alignItems: "center", gap: 10 }}
           >
             <Image
-              src="/keel_logo.png"
-              alt="Keel"
+              src="/tenorfi_logo.png"
+              alt="TenorFi"
               width={132}
               height={261}
               className="brand-logo"
               style={{ height: 28, width: "auto", flex: "none" }}
             />
-            <span style={{ lineHeight: 1 }}>Keel</span>
+            <span style={{ lineHeight: 1 }}>TenorFi</span>
           </div>
           <p style={{ fontSize: "13.5px", color: "var(--fg-tertiary)", marginTop: 14 }}>
             Fixed funding-rate positions, rebuilt natively on Aqua — with collateral that
@@ -35,7 +35,7 @@ export default function Footer() {
           <div className="foot-col">
             <span className="h">Build</span>
             <a href="/#arch">Architecture</a>
-            <a href="https://github.com/yourusername/keel" target="_blank" rel="noopener noreferrer">
+            <a href="https://github.com/yourusername/tenorfi" target="_blank" rel="noopener noreferrer">
               GitHub
             </a>
             <a href="/docs/design-doc.md">Docs</a>

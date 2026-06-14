@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef } from "react";
-import { FUNDING24H } from "@/lib/keel-data";
+import { FUNDING24H } from "@/lib/tenorfi-data";
 
 const W = 720;
 const H = 240;

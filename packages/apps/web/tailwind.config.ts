@@ -29,8 +29,8 @@ const config: Config = {
         up: { DEFAULT: "#2C8B79", tint: "#DCEBE6" },
         down: { DEFAULT: "#B0463A", tint: "#F1DCD8" },
 
-        // ---- Back-compat: legacy keel-* names mapped to the light palette ----
-        keel: {
+        // ---- Back-compat: legacy tenorfi-* names mapped to the light palette ----
+        tenorfi: {
           ink: { 950: "#F4F1EA", 900: "#EDE8DC", 800: "#FAF7F0", 700: "#FFFFFF" },
           primary: "#1A2E4C", // navy
           floating: "#C0823A", // clay
@@ -47,9 +47,9 @@ const config: Config = {
         mono: ["JetBrains Mono", "ui-monospace", "SF Mono", "monospace"],
       },
       boxShadow: {
-        "keel-sm": "0 1px 2px rgba(20,23,28,0.05), 0 1px 1px rgba(20,23,28,0.03)",
-        "keel-md": "0 6px 16px -4px rgba(20,23,28,0.08), 0 2px 6px -2px rgba(20,23,28,0.05)",
-        "keel-lg": "0 16px 36px -10px rgba(20,23,28,0.14), 0 6px 14px -6px rgba(20,23,28,0.07)",
+        "tenorfi-sm": "0 1px 2px rgba(20,23,28,0.05), 0 1px 1px rgba(20,23,28,0.03)",
+        "tenorfi-md": "0 6px 16px -4px rgba(20,23,28,0.08), 0 2px 6px -2px rgba(20,23,28,0.05)",
+        "tenorfi-lg": "0 16px 36px -10px rgba(20,23,28,0.14), 0 6px 14px -6px rgba(20,23,28,0.07)",
       },
       borderRadius: {
         xl2: "28px",

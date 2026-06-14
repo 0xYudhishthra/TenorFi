@@ -1,6 +1,6 @@
-# Keel Web App
+# TenorFi Web App
 
-Next.js web application for Keel — On-chain fixed-funding-rate swaps.
+Next.js web application for TenorFi — On-chain fixed-funding-rate swaps.
 
 ## Overview
 
@@ -17,7 +17,7 @@ This web app provides:
 
 ### Installation
 
-From the **root of the monorepo** (`keel/`):
+From the **root of the monorepo** (`tenorfi/`):
 
 ```bash
 pnpm install
@@ -41,17 +41,17 @@ pnpm start
 
 ## Logo Placement
 
-**⚠️ IMPORTANT:** Place your Keel logo files in `public/` before deploying:
+**⚠️ IMPORTANT:** Place your TenorFi logo files in `public/` before deploying:
 
 See [`public/LOGO-PLACEMENT.md`](./public/LOGO-PLACEMENT.md) for detailed instructions.
 
 ### Quick Checklist:
-- [ ] Add `public/keel-logo.svg` (main logo, 256x256px+ or SVG)
+- [ ] Add `public/tenorfi-logo.svg` (main logo, 256x256px+ or SVG)
 - [ ] Add `public/favicon.ico` (32x32px)
 - [ ] Add `public/icon.svg` (for modern browsers)
 - [ ] Add `public/og-image.png` (1200x630px for social sharing)
 
-The placeholder logo (`public/keel-logo.svg`) will work, but **replace it with your actual brand logo**.
+The placeholder logo (`public/tenorfi-logo.svg`) will work, but **replace it with your actual brand logo**.
 
 ## Pages
 
@@ -112,7 +112,7 @@ All data is currently mocked in `src/lib/mock-data.ts`:
 ```
 apps/web/
 ├── public/
-│   ├── keel-logo.svg         # ⚠️ Replace with actual logo
+│   ├── tenorfi-logo.svg         # ⚠️ Replace with actual logo
 │   ├── favicon.ico           # ⚠️ Add your favicon
 │   └── LOGO-PLACEMENT.md     # Logo placement guide
 ├── src/
@@ -142,7 +142,7 @@ apps/web/
 ## Design Tokens (Tailwind)
 
 ```ts
-keel: {
+tenorfi: {
   primary: '#3B82F6',     // Blue (locked/certainty)
   floating: '#F59E0B',    // Orange (variable/risk)
   success: '#10B981',     // Green (active)

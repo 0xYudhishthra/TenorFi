@@ -42,7 +42,7 @@ contract Settle is Script {
         uint256 pk = vm.envUint("PRIVATE_KEY"); // the subscriber (the bound taker)
         address subscriber = vm.addr(pk);
         address maker = vm.envAddress("MAKER"); // the insurance reserve (order maker)
-        int256 fixedRate = vm.envOr("FIXED_RATE", int256(8_333_333_333_333)); // 7.3% APR/hr; match the order
+        int256 fixedRate = vm.envOr("FIXED_RATE", int256(138_888_888_888)); // 7.3% APR PER-MINUTE (=APR/525600), matches periodSeconds=60
         uint256 cap = vm.envOr("CAP", uint256(4e16));
         uint256 notional = vm.envOr("NOTIONAL", uint256(100e6));
 

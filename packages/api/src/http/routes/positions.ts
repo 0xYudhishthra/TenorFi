@@ -7,6 +7,7 @@ import type { PositionService } from "../../core/services/position.js";
 import type { SettleService } from "../../core/services/settle.js";
 import type { RebalanceService } from "../../core/services/rebalance.js";
 import type { ExecutionService } from "../../core/services/execution.js";
+import type { OnchainSettleService } from "../../core/services/onchain-settle.js";
 import type { HedgePosition } from "../../core/domain/position.js";
 import { POSITION_STATUSES } from "../../core/domain/position.js";
 import { keelError } from "../../core/domain/errors.js";
@@ -51,6 +52,7 @@ export function positionsRoutes(
   settle: SettleService,
   rebalance: RebalanceService,
   execution: ExecutionService,
+  onchain?: OnchainSettleService,
 ): Hono {
   const app = new Hono();
 
@@ -89,6 +91,24 @@ export function positionsRoutes(
       detail: note,
     });
     if (!result.ok) return sendError(c, result.error);
+
+    // Ship-on-Lock: when the position enters the "shipping" step (PERP_PENDING),
+    // the reserve ships its funding order into Aqua bound to the subscriber's
+    // wallet (hedger = pos.hedger). Gated on the onchain settler + broadcast/keeper
+    // (dry-run-safe): in dry-run it logs the forge command and records simulated.
+    if (to === "PERP_PENDING" && onchain) {
+      const shipped = await onchain.ship(result.value);
+      positions.note(id, {
+        type: shipped.ok ? "order-shipped" : "ship-failed",
+        txHash: shipped.txHash,
+        detail: {
+          simulated: shipped.simulated,
+          command: shipped.command,
+          error: shipped.error,
+        },
+      });
+    }
+
     return c.json({ position: result.value });
   });
 

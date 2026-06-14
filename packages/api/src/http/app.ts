@@ -8,6 +8,7 @@ import type { PositionService } from "../core/services/position.js";
 import type { SettleService } from "../core/services/settle.js";
 import type { RebalanceService } from "../core/services/rebalance.js";
 import type { ExecutionService } from "../core/services/execution.js";
+import type { OnchainSettleService } from "../core/services/onchain-settle.js";
 import { fundingRoutes } from "./routes/funding.js";
 import { hedgeRoutes } from "./routes/hedge.js";
 import { positionsRoutes } from "./routes/positions.js";
@@ -22,6 +23,8 @@ export interface AppDeps {
   settle: SettleService;
   rebalance: RebalanceService;
   execution: ExecutionService;
+  /** Optional on-chain settler — enables ship-on-Lock. Absent → dry-run/skip. */
+  onchain?: OnchainSettleService;
 }
 
 export function createApp(deps: AppDeps): Hono {
@@ -35,7 +38,13 @@ export function createApp(deps: AppDeps): Hono {
   app.route("/hedge", hedgeRoutes(deps.hedge, deps.positions));
   app.route(
     "/positions",
-    positionsRoutes(deps.positions, deps.settle, deps.rebalance, deps.execution),
+    positionsRoutes(
+      deps.positions,
+      deps.settle,
+      deps.rebalance,
+      deps.execution,
+      deps.onchain,
+    ),
   );
   app.route("/execution", executionRoutes(deps.execution));
   app.route("/events", eventsRoutes(deps.positions));

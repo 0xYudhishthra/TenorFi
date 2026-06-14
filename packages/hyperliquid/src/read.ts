@@ -36,6 +36,40 @@ export async function getFunding(
   };
 }
 
+/** One historical funding observation for a market (Hyperliquid funds hourly). */
+export interface FundingHistoryEntry {
+  market: string;
+  /** Funding rate for that hour, as a fraction. */
+  fundingRate: number;
+  premium: number;
+  /** Unix epoch millis of the observation. */
+  time: number;
+}
+
+/**
+ * Historical funding rates for a perp market since `startTime` (epoch millis).
+ * Feeds the settlement math: realized funding accrued over a swap period.
+ */
+export async function getFundingHistory(
+  market: string,
+  startTime: number,
+  endTime?: number,
+  transport: HttpTransport = createTransport(),
+): Promise<FundingHistoryEntry[]> {
+  const info = new InfoClient({ transport });
+  const rows = await info.fundingHistory({
+    coin: market,
+    startTime,
+    ...(endTime !== undefined ? { endTime } : {}),
+  });
+  return rows.map((r) => ({
+    market: r.coin,
+    fundingRate: Number(r.fundingRate),
+    premium: Number(r.premium),
+    time: r.time,
+  }));
+}
+
 /** Full clearinghouse state for an account: margin summary, positions, withdrawable. */
 export async function getAccountState(
   address: `0x${string}`,

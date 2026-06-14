@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { BackgroundGradient } from "@/components/ui/background-gradient";
+import ConnectWallet from "@/components/shared/ConnectWallet";
 
 export default function Header() {
   const pathname = usePathname();
@@ -45,6 +46,7 @@ export default function Header() {
       </div>
 
       <div className="flex items-center gap-2.5">
+        <ConnectWallet />
         <BackgroundGradient containerClassName="rounded-full" className="rounded-full">
           <Link href="/create-position" className="btn btn-primary btn-sm">
             Create a position

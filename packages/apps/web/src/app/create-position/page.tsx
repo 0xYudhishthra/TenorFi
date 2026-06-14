@@ -2,7 +2,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { OFFERS, fmtPct, fmtUSD, fmtUSDfull, type Offer } from "@/lib/tenorfi-data";
+import {
+  OFFERS,
+  fmtPct,
+  fmtUSD,
+  fmtUSDfull,
+  estimatePositionFees,
+  fmtUsdCents,
+  type Offer,
+} from "@/lib/tenorfi-data";
+import { useWallet, truncateAddress } from "@/lib/wallet";
 
 const CAP = 0.04; // per-period funding clamp → pre-locked collateral = cap × notional
 const commas = (n: number) => n.toLocaleString("en-US");
@@ -27,6 +36,9 @@ export default function CreatePositionPage() {
   const [signing, setSigning] = useState(false);
   const [float, setFloat] = useState(41.7);
 
+  const { address, isOnBase, isConnecting, hasWallet, connect, switchToBase } = useWallet();
+  const walletReady = Boolean(address) && isOnBase;
+
   // floating ticker
   useEffect(() => {
     const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -47,6 +59,8 @@ export default function CreatePositionPage() {
   }, [offers, offer]);
 
   const prelock = Math.round(notional * CAP);
+  // Estimated open/close fees (bps of notional + flat gas). See tenorfi-data.ts.
+  const fees = estimatePositionFees(notional);
 
   const goStep = (n: number) => {
     setStep(n);
@@ -54,6 +68,9 @@ export default function CreatePositionPage() {
   };
 
   const confirm = () => {
+    // Require a connected wallet on Base before the (simulated) subscribe.
+    // The real on-chain subscribe is handled by the LI.FI Composer onboarding.
+    if (!walletReady) return;
     setSigning(true);
     window.setTimeout(() => {
       setSigning(false);
@@ -246,6 +263,7 @@ export default function CreatePositionPage() {
                   ["Max coverage", fmtUSDfull(offer.maxCoverage)],
                   ["Collateral pre-locked", `${fmtUSDfull(prelock)} / period`],
                   ["Settlement", "USDC · hourly · Base mainnet"],
+                  ["Subscriber", address ? truncateAddress(address) : "Not connected"],
                 ].map(([k, v], i) => (
                   <div className="r" key={i}>
                     <span className="k">{k}</span>
@@ -265,26 +283,69 @@ export default function CreatePositionPage() {
                   <div className="d">Your collateral ships into Aqua as a live virtual balance.</div>
                 </div>
               </div>
+              <div className="rev" style={{ marginTop: 14 }}>
+                <div className="r">
+                  <span className="k">
+                    Est. fee to open{" "}
+                    <span className="badge badge-clay" style={{ fontSize: 10, marginLeft: 4 }}>
+                      <span className="dot" /> estimated
+                    </span>
+                  </span>
+                  <span className="v mono">~{fmtUsdCents(fees.openTotalUsd)}</span>
+                </div>
+                <div className="r">
+                  <span className="k">Est. fee to close</span>
+                  <span className="v mono">~{fmtUsdCents(fees.closeTotalUsd)}</span>
+                </div>
+              </div>
               <div className="flow-actions">
                 <button className="btn btn-ghost btn-lg" onClick={() => goStep(1)}>
                   ← Back
                 </button>
-                <button className="btn btn-primary btn-lg" disabled={signing} onClick={confirm}>
-                  {signing ? (
-                    <>
-                      <span className="spin" />
-                      Signing…
-                    </>
-                  ) : (
-                    <>
-                      <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
-                        <path d="M12 2 4 6v6c0 5 3.5 7.5 8 9 4.5-1.5 8-4 8-9V6l-8-4Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-                      </svg>
-                      Confirm &amp; sign
-                    </>
-                  )}
-                </button>
+                {!hasWallet ? (
+                  <a
+                    href="https://metamask.io"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-primary btn-lg"
+                  >
+                    Install a wallet to subscribe
+                  </a>
+                ) : !address ? (
+                  <button
+                    className="btn btn-primary btn-lg"
+                    disabled={isConnecting}
+                    onClick={connect}
+                  >
+                    {isConnecting ? "Connecting…" : "Connect wallet to subscribe"}
+                  </button>
+                ) : !isOnBase ? (
+                  <button className="btn btn-primary btn-lg" onClick={switchToBase}>
+                    Switch to Base to subscribe
+                  </button>
+                ) : (
+                  <button className="btn btn-primary btn-lg" disabled={signing} onClick={confirm}>
+                    {signing ? (
+                      <>
+                        <span className="spin" />
+                        Signing…
+                      </>
+                    ) : (
+                      <>
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+                          <path d="M12 2 4 6v6c0 5 3.5 7.5 8 9 4.5-1.5 8-4 8-9V6l-8-4Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+                        </svg>
+                        Confirm &amp; sign
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
+              <p style={{ fontSize: 12, color: "var(--fg-tertiary)", marginTop: 12, lineHeight: 1.5 }}>
+                The actual on-chain subscribe is handled by the LI.FI Composer onboarding — one
+                signature brings your USDC cross-chain and opens both legs. A connected wallet on
+                Base is required first.
+              </p>
             </section>
           )}
 

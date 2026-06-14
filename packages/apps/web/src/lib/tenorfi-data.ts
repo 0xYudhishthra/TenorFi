@@ -127,6 +127,132 @@ export function ago(sec: number): string {
   return Math.floor(sec / 3600) + "h ago";
 }
 
+/* ============================================================================
+   FUNDING COST BREAKDOWN — the core value prop.
+   For each settlement period we compare:
+     - what Hyperliquid funding would have cost the holder UNHEDGED ("HL charged")
+     - what the TenorFi swap settled for that period ("TenorFi net")
+     - the holder's resulting REAL cost — the fixed rate, constant every period.
+   All numbers are derived from the mock FUNDING24H series + the position's
+   notional and fixed rate. To wire to live data later, replace the
+   `realizedHourlyRates()` source with the keel-api `/funding` endpoint
+   (realized hourly funding rate per hour) — the math below stays identical.
+   ============================================================================ */
+
+// Annualize an hourly funding rate (as a %) → APR %. hourly × 24 × 365.
+export const hourlyToApr = (hourlyPct: number) => hourlyPct * 24 * 365;
+// USD charged/credited for one hour at an hourly rate (%) on a notional.
+const hourlyUsd = (hourlyPct: number, notional: number) =>
+  (hourlyPct / 100) * notional;
+
+// Mock source: realized hourly funding rate (%) per period.
+// NOTE: derived from FUNDING24H (annualized AFR) → hourly. Wire this to the
+// keel-api `/funding` endpoint (realized hourly rate per hour) to go live.
+// `anchorApr` (the position's fixed rate) is used only to spread the sampled
+// funding around the fixed line so the demo shows BOTH credit periods
+// (realized > fixed) and small-premium periods (realized < fixed). The live
+// `/funding` feed already carries real variance, so this spread drops away.
+function realizedHourlyRates(count: number, anchorApr: number): number[] {
+  return Array.from({ length: count }, (_, i) => {
+    const afrApr = FUNDING24H[i % FUNDING24H.length].afr; // annualized %
+    // Recenter the sampled AFR near the fixed rate, keeping its hour-to-hour
+    // shape, so realized funding crosses above and below the fixed line.
+    const meanAfr = 24; // approx mean of FUNDING24H
+    const spread = 0.55; // dampen amplitude → realistic period-to-period drift
+    const recentered = anchorApr + (afrApr - meanAfr) * spread;
+    const variableApr = Math.max(0.5, recentered); // funding APR floor
+    return variableApr / (24 * 365); // → realized hourly %
+  });
+}
+
+export interface FundingBreakdownRow {
+  period: number; // 1-indexed hour
+  hlAprPct: number; // variable HL funding APR for this period
+  hlUsd: number; // HL funding cost this period (USD, positive magnitude)
+  netAprPct: number; // TenorFi net APR (signed: + = credit to holder)
+  netUsd: number; // TenorFi net USD (signed)
+  realAprPct: number; // holder's real cost APR (= fixed rate, constant)
+  realUsd: number; // holder's real cost USD (= fixed hourly, constant)
+}
+
+/**
+ * Per-period funding cost comparison for a position.
+ * Invariant (signed, in USD): hlUsd_signed + netUsd = realUsd_signed, where
+ *   hlUsd_signed = -hlUsd (a cost) and realUsd_signed = -realUsd (a cost).
+ * Equivalently: hlUsd + netUsd_as_cost == realUsd. We expose hlUsd as a
+ * positive magnitude (rendered as a cost) and netUsd signed.
+ */
+export function fundingBreakdown(
+  position: Position,
+  periods = 6
+): FundingBreakdownRow[] {
+  const fixedHourlyPct = position.fixedRate / (24 * 365); // fixed APR → hourly %
+  const fixedUsd = hourlyUsd(fixedHourlyPct, position.notional);
+  const rates = realizedHourlyRates(periods, position.fixedRate);
+
+  return rates.map((realizedHourlyPct, i) => {
+    const hlUsd = hourlyUsd(realizedHourlyPct, position.notional); // variable cost
+    // TenorFi settles realized − fixed. If realized > fixed → credit (+); else premium (−).
+    const netUsd = hlUsd - fixedUsd; // signed
+    const netAprPct = hourlyToApr(realizedHourlyPct - fixedHourlyPct); // signed
+    return {
+      period: i + 1,
+      hlAprPct: hourlyToApr(realizedHourlyPct),
+      hlUsd,
+      netAprPct,
+      netUsd,
+      realAprPct: position.fixedRate, // constant every period
+      realUsd: fixedUsd, // constant every period
+    };
+  });
+}
+
+/* ============================================================================
+   POSITION FEES — estimated open/close cost (no live fee feed).
+   Model: bps-of-notional for the routing/unwind legs + a flat gas estimate.
+   Clearly an ESTIMATE; replace with live quotes (LI.FI / Aqua) when wired.
+   ============================================================================ */
+const OPEN_BRIDGE_BPS = 6; // LI.FI cross-chain routing, bps of notional
+const OPEN_SHIP_BPS = 2; // Aqua ship into virtual balance, bps of notional
+const CLOSE_UNWIND_BPS = 4; // unwind both legs, bps of notional
+const GAS_FLAT_USD = 1.2; // flat gas estimate (Base mainnet), per action
+
+export interface PositionFeeEstimate {
+  openBridgeUsd: number;
+  openShipUsd: number;
+  openGasUsd: number;
+  openTotalUsd: number;
+  closeUnwindUsd: number;
+  closeGasUsd: number;
+  closeTotalUsd: number;
+}
+
+export function estimatePositionFees(notional: number): PositionFeeEstimate {
+  const bps = (b: number) => (notional * b) / 10000;
+  const openBridgeUsd = bps(OPEN_BRIDGE_BPS);
+  const openShipUsd = bps(OPEN_SHIP_BPS);
+  const closeUnwindUsd = bps(CLOSE_UNWIND_BPS);
+  return {
+    openBridgeUsd,
+    openShipUsd,
+    openGasUsd: GAS_FLAT_USD,
+    openTotalUsd: openBridgeUsd + openShipUsd + GAS_FLAT_USD,
+    closeUnwindUsd,
+    closeGasUsd: GAS_FLAT_USD,
+    closeTotalUsd: closeUnwindUsd + GAS_FLAT_USD,
+  };
+}
+
+/* ---- fee formatters ---- */
+// APR with sign, e.g. "+11.0%" / "−4.0%"
+export const fmtAprSigned = (n: number) =>
+  (n >= 0 ? "+" : "−") + Math.abs(n).toFixed(1) + "%";
+// USD with sign and cents, e.g. "+$6.28" / "−$0.57"
+export const fmtUsdSigned = (n: number) =>
+  (n >= 0 ? "+" : "−") + "$" + Math.abs(n).toFixed(2);
+// USD with cents, no forced sign, e.g. "$8.56"
+export const fmtUsdCents = (n: number) => "$" + n.toFixed(2);
+
 /* ---- lookups ---- */
 export const getPosition = (id: number) => POSITIONS.find((p) => p.id === id);
 export const positionsByAddress = (addr: string) =>

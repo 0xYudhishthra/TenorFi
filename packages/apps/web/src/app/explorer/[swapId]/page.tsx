@@ -7,6 +7,11 @@ import {
   fmtUSDfull,
   fmtPct,
   ago,
+  fundingBreakdown,
+  estimatePositionFees,
+  fmtAprSigned,
+  fmtUsdSigned,
+  fmtUsdCents,
 } from "@/lib/tenorfi-data";
 
 export function generateStaticParams() {
@@ -46,6 +51,12 @@ export default function PositionDetailPage({
     (sum, s) => sum + (s.receiver === "Hedger" ? s.amount : -s.amount),
     0
   );
+
+  // Per-period funding cost comparison + open/close fee estimate.
+  // Derived in tenorfi-data.ts from the mock funding series; swap the
+  // realized-rate source for the keel-api `/funding` endpoint to go live.
+  const breakdown = fundingBreakdown(position, 6);
+  const fees = estimatePositionFees(position.notional);
 
   return (
     <main className="wrap pd">
@@ -180,6 +191,65 @@ export default function PositionDetailPage({
               </table>
             </div>
           </div>
+
+          {/* Funding cost breakdown — the value prop, per period */}
+          <div className="card tablecard">
+            <div className="panel-head">
+              <h3>Funding cost breakdown</h3>
+              <span className="meta">{breakdown.length} periods</span>
+            </div>
+            <p style={{ fontSize: 13, color: "var(--fg-tertiary)", lineHeight: 1.5, padding: "0 16px 4px" }}>
+              Hyperliquid funding swings every hour. TenorFi&apos;s settlement absorbs the
+              difference so <b style={{ color: "var(--navy)" }}>your real cost stays fixed at{" "}
+              {fmtPct(position.fixedRate)} APR</b> — regardless of what Hyperliquid charges.
+            </p>
+            <div style={{ overflowX: "auto" }}>
+              <table className="tbl" data-tabular="true">
+                <thead>
+                  <tr>
+                    <th>Period</th>
+                    <th>HL charged (variable)</th>
+                    <th>TenorFi net</th>
+                    <th>Your real cost</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {breakdown.map((r) => (
+                    <tr key={r.period}>
+                      <td data-label="Period" style={{ fontSize: 13.5 }}>
+                        Hour {r.period}
+                      </td>
+                      {/* HL charged — always a cost (variable), shown in clay */}
+                      <td className="num" data-label="HL charged (variable)" style={{ color: "var(--clay-600)", fontWeight: 600 }}>
+                        −{r.hlAprPct.toFixed(1)}% APR{" "}
+                        <span style={{ color: "var(--fg-tertiary)", fontWeight: 500, fontSize: 12.5 }}>
+                          (~{fmtUsdCents(r.hlUsd)})
+                        </span>
+                      </td>
+                      {/* TenorFi net — signed: + credit (green), − premium (red) */}
+                      <td className="num" data-label="TenorFi net" style={{ color: r.netUsd >= 0 ? "var(--up)" : "var(--down)", fontWeight: 600 }}>
+                        {fmtAprSigned(r.netAprPct)} APR{" "}
+                        <span style={{ color: "var(--fg-tertiary)", fontWeight: 500, fontSize: 12.5 }}>
+                          ({fmtUsdSigned(r.netUsd)})
+                        </span>
+                      </td>
+                      {/* Your real cost — the fixed rate, constant every row */}
+                      <td className="num" data-label="Your real cost" style={{ color: "var(--navy)", fontWeight: 600 }}>
+                        −{r.realAprPct.toFixed(1)}% APR{" "}
+                        <span style={{ color: "var(--fg-tertiary)", fontWeight: 500, fontSize: 12.5 }}>
+                          (~{fmtUsdCents(r.realUsd)})
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p style={{ fontSize: 12.5, color: "var(--fg-tertiary)", marginTop: 4, padding: "12px 16px 4px", lineHeight: 1.5, borderTop: "1px solid var(--line)" }}>
+              Your cost stays fixed regardless of what Hyperliquid charges. Per-hour USD figures
+              scale with the {fmtUSDfull(position.notional)} notional; APR is the annualized rate.
+            </p>
+          </div>
         </div>
 
         {/* right: parties + net */}
@@ -217,6 +287,53 @@ export default function PositionDetailPage({
               <span className="k">LP</span>
               <span className="v">{shortAddr(position.lp)}</span>
             </div>
+          </div>
+
+          <div className="card pd-card">
+            <h2 className="display" style={{ fontSize: 18, marginBottom: 4 }}>
+              Position fees
+            </h2>
+            <p style={{ fontSize: 12, color: "var(--fg-tertiary)", marginBottom: 12 }}>
+              <span className="badge badge-clay" style={{ fontSize: 10.5 }}>
+                <span className="dot" /> estimated
+              </span>
+            </p>
+            <div className="kv">
+              <span className="k">Open · bridge (LI.FI)</span>
+              <span className="v mono">{fmtUsdCents(fees.openBridgeUsd)}</span>
+            </div>
+            <div className="kv">
+              <span className="k">Open · Aqua ship</span>
+              <span className="v mono">{fmtUsdCents(fees.openShipUsd)}</span>
+            </div>
+            <div className="kv">
+              <span className="k">Open · gas</span>
+              <span className="v mono">{fmtUsdCents(fees.openGasUsd)}</span>
+            </div>
+            <div className="kv" style={{ borderTop: "1px solid var(--line)", paddingTop: 8, marginTop: 4 }}>
+              <span className="k" style={{ fontWeight: 600 }}>To open</span>
+              <span className="v mono" style={{ color: "var(--navy)", fontWeight: 600 }}>
+                ~{fmtUsdCents(fees.openTotalUsd)}
+              </span>
+            </div>
+            <div className="kv" style={{ marginTop: 8 }}>
+              <span className="k">Close · unwind both legs</span>
+              <span className="v mono">{fmtUsdCents(fees.closeUnwindUsd)}</span>
+            </div>
+            <div className="kv">
+              <span className="k">Close · gas</span>
+              <span className="v mono">{fmtUsdCents(fees.closeGasUsd)}</span>
+            </div>
+            <div className="kv" style={{ borderTop: "1px solid var(--line)", paddingTop: 8, marginTop: 4 }}>
+              <span className="k" style={{ fontWeight: 600 }}>To close</span>
+              <span className="v mono" style={{ color: "var(--navy)", fontWeight: 600 }}>
+                ~{fmtUsdCents(fees.closeTotalUsd)}
+              </span>
+            </div>
+            <p style={{ fontSize: 11.5, color: "var(--fg-tertiary)", marginTop: 12, lineHeight: 1.5 }}>
+              Estimate only — bps of notional plus a flat gas figure. Live quotes resolve at
+              signing time.
+            </p>
           </div>
 
           <Link href="/create-position" className="btn btn-primary btn-lg">

@@ -97,8 +97,7 @@ flowchart LR
     CRE -->|DON consensus| FWD["KeystoneForwarder"]
     FWD -->|"onReport(metadata, report)"| RECV["KeelFundingReceiver (Base mainnet)"]
     RECV -->|setFundingIndex period, R| IDX["FundingIndex"]
-    IDX --> K["KeelSwap.settle"]
-    IDX --> O["_fundingSettle opcode"]
+    IDX --> O["_fundingSettle opcode (settlement, over Aqua)"]
     IDX --> M["MCP get_funding"]
 ```
 
@@ -141,8 +140,8 @@ function setFundingIndex(uint256 period, int256 value) external onlyForwarder {
 - HL `fundingRate` is hourly fractional (e.g. `"0.0000125"`); convert to per-period `1e18` signed in the workflow.
 
 **Why it's load-bearing.** Canonical CRE shape: **external API → DON consensus → on-chain state
-change** (`setFundingIndex`), not a UI reading a feed. The index is consumed by three parts of the
-system — `KeelSwap`, the `_fundingSettle` opcode, and the MCP's `get_funding`.
+change** (`setFundingIndex`), not a UI reading a feed. The index is consumed by two parts of the
+system — the **`_fundingSettle` opcode** (the settlement path, over Aqua) and the MCP's `get_funding`.
 
 **Qualification.** CRE workflow as orchestration layer ✓ · integrates a blockchain with an external
 API (Hyperliquid) ✓ · a successful CRE CLI simulation qualifies (they deploy it live for you) — land
@@ -164,20 +163,20 @@ code path, no contract change — but keep ≥1 real CRE write for the bounty.
 
 **What we build.** One-click dual-leg onboarding: a LI.FI Composer Flow bridges the user's USDC from
 any chain and, in the same flow, (a) deposits collateral into Hyperliquid (HyperCore) for the perp
-leg and (b) opens the Keel swap (`KeelSwap.open`). The MCP uses Composer as its execution layer
+leg and (b) opens the Keel swap (ships the leg into Aqua via `KeelFundingProgram`/`KeelSwapVMRouter`). The MCP uses Composer as its execution layer
 (Agentic Workflows track). *(Section owned by the integration lead; design-doc §6 has the flow.)*
 
 ```mermaid
 flowchart TB
     USER["USDC on any chain"] -->|LI.FI Composer Flow| BRIDGE["bridge to Base mainnet / HyperCore"]
     BRIDGE --> DEP["deposit collateral → Hyperliquid (perp leg)"]
-    BRIDGE --> OPEN["KeelSwap.open (hedge leg)"]
+    BRIDGE --> OPEN["ship Keel leg into Aqua (hedge leg)"]
 ```
 
 **Why it's load-bearing.** A hedger's capital is rarely already on the settlement chain; without
 LI.FI, funding the hedge is a manual multi-step bridge. Composer makes "fund + open both legs" a
 single confirmation. **Open item (integration lead):** confirm a single Flow can chain an arbitrary
-`KeelSwap.open` call alongside the HL deposit; else two sequenced calls behind one MCP confirmation.
+contract call (the Aqua `ship` that opens the Keel leg) alongside the HL deposit; else two sequenced calls behind one MCP confirmation.
 
 ---
 

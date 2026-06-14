@@ -11,12 +11,12 @@ import {
   fmtUsdCents,
   type Offer,
 } from "@/lib/tenorfi-data";
-import { useWallet, truncateAddress } from "@/lib/wallet";
+import { useAppKit } from "@reown/appkit/react";
+import { useAccount, useChainId, useSwitchChain } from "wagmi";
+import { truncateAddress, BASE_CHAIN_ID } from "@/lib/wallet";
 import { quoteHedge, type HedgeQuote } from "@/lib/api";
 
 const CAP = 0.04; // per-period funding clamp → pre-locked collateral = cap × notional
-// Base mainnet — where the user funds the hedge from.
-const BASE_CHAIN_ID = 8453;
 const commas = (n: number) => n.toLocaleString("en-US");
 const parseNum = (s: string) => parseInt(String(s).replace(/[^0-9]/g, ""), 10) || 0;
 
@@ -43,8 +43,12 @@ export default function CreatePositionPage() {
   const [quote, setQuote] = useState<HedgeQuote | null>(null);
   const [quoteError, setQuoteError] = useState<string | null>(null);
 
-  const { address, isOnBase, isConnecting, connect, switchToBase } = useWallet();
-  const walletReady = Boolean(address) && isOnBase;
+  const { open } = useAppKit();
+  const { address, isConnected, isConnecting } = useAccount();
+  const chainId = useChainId();
+  const { switchChain } = useSwitchChain();
+  const isOnBase = chainId === BASE_CHAIN_ID;
+  const walletReady = isConnected && Boolean(address) && isOnBase;
 
   // floating ticker
   useEffect(() => {
@@ -331,16 +335,19 @@ export default function CreatePositionPage() {
                 <button className="btn btn-ghost btn-lg" onClick={() => goStep(1)}>
                   ← Back
                 </button>
-                {!address ? (
+                {!isConnected || !address ? (
                   <button
                     className="btn btn-primary btn-lg"
                     disabled={isConnecting}
-                    onClick={connect}
+                    onClick={() => open()}
                   >
                     {isConnecting ? "Connecting…" : "Connect wallet to subscribe"}
                   </button>
                 ) : !isOnBase ? (
-                  <button className="btn btn-primary btn-lg" onClick={switchToBase}>
+                  <button
+                    className="btn btn-primary btn-lg"
+                    onClick={() => switchChain({ chainId: BASE_CHAIN_ID })}
+                  >
                     Switch to Base to subscribe
                   </button>
                 ) : (

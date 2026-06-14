@@ -9,13 +9,21 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@walletconnect/ethereum-provider": "^2.17.0",
+    "@reown/appkit": "^1.8.20",
+    "@reown/appkit-adapter-wagmi": "^1.8.20",
+    "@tanstack/react-query": "^5.101.0",
+    "clsx": "^2.1.0",
+    "framer-motion": "^11.0.0",
     "next": "^14.2.35",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
-    "clsx": "^2.1.0",
     "tailwind-merge": "^2.2.0",
-    "framer-motion": "^11.0.0"
+    "viem": "^2.52.2",
+    "wagmi": "^2.19.5"
+  },
+  "overrides": {
+    "@wagmi/connectors": "6.2.0",
+    "@wagmi/core": "2.22.1"
   },
   "devDependencies": {
     "@types/node": "^20",

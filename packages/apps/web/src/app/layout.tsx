@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import "./globals.css";
+import Web3Provider from "@/context/web3";
 import Header from "@/components/shared/Header";
 import Footer from "@/components/shared/Footer";
 
@@ -28,12 +30,19 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Read the request cookie so the wagmi store can be rehydrated on the client
+  // with the same state the server saw (clean SSR hydration). headers() is
+  // synchronous in Next 14.
+  const cookies = headers().get("cookie");
+
   return (
     <html lang="en">
       <body className="antialiased">
-        <Header />
-        <main className="min-h-screen">{children}</main>
-        <Footer />
+        <Web3Provider cookies={cookies}>
+          <Header />
+          <main className="min-h-screen">{children}</main>
+          <Footer />
+        </Web3Provider>
       </body>
     </html>
   );

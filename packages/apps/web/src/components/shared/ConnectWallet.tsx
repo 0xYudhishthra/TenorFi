@@ -1,20 +1,35 @@
 "use client";
 
-import { useWallet, truncateAddress } from "@/lib/wallet";
+import { useAppKit } from "@reown/appkit/react";
+import { useAccount, useChainId, useSwitchChain } from "wagmi";
+import { truncateAddress, BASE_CHAIN_ID } from "@/lib/wallet";
 
 /**
- * Wallet connect button for the top nav (WalletConnect).
- * States: disconnected → "Connect Wallet" (opens WC QR modal) ·
- * connected + wrong chain → "Switch to Base" · connected + Base → truncated
- * address with a Disconnect affordance (WC sessions persist across reloads).
+ * Wallet connect button for the top nav (Reown AppKit + wagmi).
+ *
+ * States:
+ *  - disconnected → "Connect Wallet" opens the AppKit modal, which lists the
+ *    installed browser wallet (MetaMask injected) AND WalletConnect (QR/mobile).
+ *  - connected + wrong chain → "Switch to Base" (wagmi useSwitchChain).
+ *  - connected + Base → truncated address; click reopens the AppKit modal
+ *    (account view, where the user can disconnect/switch).
  */
 export default function ConnectWallet() {
-  const { address, isConnecting, isOnBase, connect, switchToBase, disconnect } = useWallet();
+  const { open } = useAppKit();
+  const { address, isConnected, isConnecting } = useAccount();
+  const chainId = useChainId();
+  const { switchChain } = useSwitchChain();
+
+  const isOnBase = chainId === BASE_CHAIN_ID;
 
   // Disconnected.
-  if (!address) {
+  if (!isConnected || !address) {
     return (
-      <button className="btn btn-ghost btn-sm" onClick={connect} disabled={isConnecting}>
+      <button
+        className="btn btn-ghost btn-sm"
+        onClick={() => open()}
+        disabled={isConnecting}
+      >
         {isConnecting ? "Connecting…" : "Connect Wallet"}
       </button>
     );
@@ -23,22 +38,32 @@ export default function ConnectWallet() {
   // Connected but on the wrong network.
   if (!isOnBase) {
     return (
-      <button className="btn btn-ghost btn-sm" onClick={switchToBase} title="Wrong network">
-        <span className="badge badge-clay" style={{ height: 22, padding: "0 8px", fontSize: 11 }}>
+      <button
+        className="btn btn-ghost btn-sm"
+        onClick={() => switchChain({ chainId: BASE_CHAIN_ID })}
+        title="Wrong network"
+      >
+        <span
+          className="badge badge-clay"
+          style={{ height: 22, padding: "0 8px", fontSize: 11 }}
+        >
           <span className="dot" /> Switch to Base
         </span>
       </button>
     );
   }
 
-  // Connected on Base. Click to disconnect (WalletConnect session persists).
+  // Connected on Base. Click opens the AppKit account modal (disconnect/switch).
   return (
     <button
       className="btn btn-ghost btn-sm mono"
-      title={`${address} · click to disconnect`}
-      onClick={disconnect}
+      title={`${address} · click to manage`}
+      onClick={() => open()}
     >
-      <span className="badge badge-up" style={{ height: 22, padding: "0 8px", fontSize: 11 }}>
+      <span
+        className="badge badge-up"
+        style={{ height: 22, padding: "0 8px", fontSize: 11 }}
+      >
         <span className="dot" />
       </span>
       {truncateAddress(address)}

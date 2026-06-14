@@ -36,8 +36,11 @@ const ConfigSchema = z.object({
   //
   /** Base RPC endpoint. Absent → dry-run. */
   BASE_RPC_URL: z.string().url().optional(),
-  /** Reserve/keeper key that signs ship+settle. Absent → dry-run. NEVER logged. */
+  /** Reserve/keeper key that signs the SHIP (maker = reserve). Absent → dry-run. NEVER logged. */
   KEEPER_PRIVATE_KEY: hexKey.optional(),
+  /** Subscriber/hedger key that signs the SETTLE (the order is taker-bound to the
+   *  subscriber; the reserve key would fail `UnauthorizedTaker`). NEVER logged. */
+  SUBSCRIBER_PRIVATE_KEY: hexKey.optional(),
   /** The insurance reserve (order maker / MAKER). Defaults to the keeper's own address. */
   RESERVE_ADDRESS: hexAddress.optional(),
   /** Master broadcast switch. Must be true (AND key+rpc present) to send real txs. */

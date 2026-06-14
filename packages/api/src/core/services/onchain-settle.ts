@@ -15,11 +15,14 @@ import { deriveOrderParams } from "../../onchain/order-params.js";
 export interface OnchainSettleConfig {
   /** Base RPC endpoint. Absent → dry-run. */
   rpcUrl?: string;
-  /** Reserve/keeper key that signs ship+settle. Absent → dry-run. */
+  /** Reserve/keeper key that signs the SHIP (maker = reserve). Absent → ship dry-run. */
   keeperKey?: `0x${string}`;
+  /** Subscriber/hedger key that signs the SETTLE (the order is taker-bound to the
+   *  subscriber — the reserve key would revert UnauthorizedTaker). Absent → settle dry-run. */
+  subscriberKey?: `0x${string}`;
   /** The insurance reserve (order maker). Falls back to nothing → dry-run note. */
   reserve?: `0x${string}`;
-  /** Master broadcast switch — must also have key+rpc. */
+  /** Master broadcast switch — must also have the right key + rpc + reserve. */
   broadcast: boolean;
 }
 
@@ -36,32 +39,36 @@ export function createOnchainSettleService(
   config: OnchainSettleConfig,
 ): OnchainSettleService {
   const reserve = config.reserve;
-  const broadcast = !!(config.broadcast && config.rpcUrl && config.keeperKey && reserve);
+  // Ship is signed by the reserve/keeper; settle by the subscriber (hedger). Gate each
+  // independently so a missing subscriber key only downgrades settle to dry-run.
+  const canShip = !!(config.broadcast && config.rpcUrl && config.keeperKey && reserve);
+  const canSettle = !!(config.broadcast && config.rpcUrl && config.subscriberKey && reserve);
+  const ZERO = "0x0000000000000000000000000000000000000000" as `0x${string}`;
 
   return {
     enabled() {
-      return broadcast;
+      return canShip && canSettle;
     },
 
     async settle(pos) {
       const { notional, fixedRate, cap } = deriveOrderParams(pos);
       return forgeSettle({
         subscriber: pos.hedger,
-        // maker = the reserve. In dry-run reserve may be undefined → echo a placeholder.
-        maker: reserve ?? ("0x0000000000000000000000000000000000000000" as `0x${string}`),
+        maker: reserve ?? ZERO,
         notional,
         fixedRate,
         cap,
         rpcUrl: config.rpcUrl,
-        keeperKey: config.keeperKey,
-        broadcast,
+        // SETTLE is signed by the subscriber/hedger (the bound taker), NOT the reserve.
+        keeperKey: config.subscriberKey,
+        broadcast: canSettle,
       });
     },
 
     async ship(pos) {
       const { notional, fixedRate, cap, collateralFloor } = deriveOrderParams(pos);
       return forgeShip({
-        reserve: reserve ?? ("0x0000000000000000000000000000000000000000" as `0x${string}`),
+        reserve: reserve ?? ZERO,
         hedger: pos.hedger,
         notional,
         // ship at least the no-default floor (cap×notional).
@@ -69,8 +76,9 @@ export function createOnchainSettleService(
         fixedRate,
         cap,
         rpcUrl: config.rpcUrl,
+        // SHIP is signed by the reserve/keeper (the maker).
         keeperKey: config.keeperKey,
-        broadcast,
+        broadcast: canShip,
       });
     },
   };

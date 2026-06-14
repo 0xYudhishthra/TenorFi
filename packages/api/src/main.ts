@@ -53,7 +53,8 @@ const execution = createExecutionService(createExecutionRepo(db), positions);
 // AND SETTLE_BROADCAST=true. Reuses the `reserve` resolved above as the maker.
 const onchain = createOnchainSettleService({
   rpcUrl: config.BASE_RPC_URL,
-  keeperKey,
+  keeperKey, // signs SHIP (maker = reserve)
+  subscriberKey: config.SUBSCRIBER_PRIVATE_KEY as `0x${string}` | undefined, // signs SETTLE (bound taker)
   reserve,
   broadcast: config.SETTLE_BROADCAST,
 });

@@ -44,7 +44,7 @@ When a side's collateral can no longer cover one more worst-case period (`remain
 | **1inch Aqua / SwapVM** | Custom `_fundingSettle` instruction settles a period as `amountOut = net`; collateral stays live via virtual balances | `packages/contracts/src/swapvm` |
 | **Chainlink CRE** | Funding-rate oracle: reads Hyperliquid BTC funding → DON consensus → on-chain `FundingIndex` | `packages/cre` · [`docs/bounty-integrations.md`](docs/bounty-integrations.md) |
 | **LI.FI Composer** | Cross-chain collateral onboarding: fund + open the hedge with USDC from any chain | (integration lead) |
-| **Settlement core** | `KeelSwap` (matched swap, settlement, no-default) + `FundingIndex` (write-once latch) | `packages/contracts/src` |
+| **Settlement** | `_fundingSettle` SwapVM opcode over Aqua (no custodial contract — collateral stays live) + `FundingIndex` (write-once latch) | `packages/contracts/src` |
 
 ## Architecture
 
@@ -64,7 +64,7 @@ flowchart TB
 ```mermaid
 flowchart TB
     A["Hyperliquid BTC funding (hourly — the public number)"] -->|"CRE: fetch → DON → KeystoneForwarder → KeelFundingReceiver.onReport"| B["FundingIndex.setFundingIndex(period, R)<br/>on Base mainnet"]
-    B -->|"keeper fires settle() each period"| C["_fundingSettle opcode / KeelSwap<br/>net = clamp(R − F, ±cap) × N"]
+    B -->|"keeper fires settle each period"| C["_fundingSettle opcode (over Aqua)<br/>net = clamp(R − F, ±cap) × N"]
     C --> D["USDC moves hedger ↔ LP via Aqua virtual balances<br/>(collateral never locked)"]
 ```
 
@@ -72,8 +72,8 @@ flowchart TB
 
 | Component | Status | Where |
 |-----------|--------|-------|
-| Settlement core (`KeelSwap` + `FundingIndex`) | **Built · 25 tests** | `packages/contracts/src` |
-| Custom SwapVM opcode (`_fundingSettle` + router + program) | **Built · unit + e2e** (settlement moves real USDC via Aqua) · double-settle guarded; Base mainnet deploy pending | `packages/contracts/src/swapvm` |
+| Settlement — custom SwapVM opcode (`_fundingSettle` + router + program) over Aqua | **Built · unit + e2e + Base-mainnet fork** (settlement moves real USDC via Aqua) · double-settle guarded · no-default proven; Base mainnet deploy pending | `packages/contracts/src/swapvm` |
+| Funding latch (`FundingIndex`, write-once) | **Built** | `packages/contracts/src` |
 | Chainlink CRE consumer (`KeelFundingReceiver` onReport → FundingIndex) | **Built · 12 tests** | `packages/contracts/src` |
 | Deploy script + wiring test (Base mainnet) | **Built · 1 test** | `packages/contracts/script` |
 | Chainlink CRE funding oracle | Planned (M2) | `packages/cre` |

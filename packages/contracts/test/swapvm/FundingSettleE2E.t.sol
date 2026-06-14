@@ -122,4 +122,46 @@ contract FundingSettleE2ETest is Test {
         vm.expectRevert(FundingSettle.UnauthorizedTaker.selector);
         router.swap(order, address(pos), address(usdc), 0, _takerData(stranger));
     }
+
+    // No-default, the Aqua way: a maker who ships exactly one period's worst-case max (cap × notional)
+    // always covers the worst possible period; a second worst-case period it never funded reverts at
+    // the Aqua layer (insufficient virtual balance) rather than creating unbacked debt. The cap is the
+    // per-period bound, the shipped virtual balance is the collateral, and Aqua can never push tokens
+    // the maker did not ship — so a credited taker is always fully backed and no side can be overdrawn.
+    function test_noDefault_shipFloorCoversWorstCase_underfundedPeriodReverts() public {
+        uint256 floor = (CAP * N) / ONE; // cap × notional = 2,000 USDC = one period's max
+
+        // LP ships EXACTLY the no-default floor (not the generous 5,000 of _ship()).
+        ISwapVM.Order memory order =
+            program.buildProgram(lp, address(idx), F, CAP, N, PERIOD_SECONDS, hedger, true);
+        vm.startPrank(lp);
+        usdc.approve(address(aqua), type(uint256).max);
+        pos.approve(address(aqua), type(uint256).max);
+        address[] memory tokens = new address[](2);
+        tokens[0] = address(pos);
+        tokens[1] = address(usdc);
+        uint256[] memory amounts = new uint256[](2);
+        amounts[0] = ONE;
+        amounts[1] = floor;
+        aqua.ship(address(router), abi.encode(order), tokens, amounts);
+        vm.stopPrank();
+
+        // Period A: a spike far past the cap clamps to cap and settles to EXACTLY the floor — the
+        // worst possible period is fully covered, draining the shipped balance to zero.
+        uint256 pA = block.timestamp / PERIOD_SECONDS;
+        idx.setFundingIndex(pA, int256((ONE * 50) / 100)); // 50% → clamps to 4% cap
+        uint256 hedgerBefore = usdc.balanceOf(hedger);
+        vm.prank(hedger);
+        router.swap(order, address(pos), address(usdc), 0, _takerData(hedger));
+        assertEq(usdc.balanceOf(hedger), hedgerBefore + floor, "worst-case period fully covered");
+
+        // Period B: the maker never funded a second worst-case period. Settlement reverts (no tokens
+        // to push) instead of creating unbacked debt — the no-default guarantee.
+        vm.warp(block.timestamp + PERIOD_SECONDS);
+        uint256 pB = block.timestamp / PERIOD_SECONDS;
+        idx.setFundingIndex(pB, int256((ONE * 50) / 100));
+        vm.prank(hedger);
+        vm.expectRevert();
+        router.swap(order, address(pos), address(usdc), 0, _takerData(hedger));
+    }
 }

@@ -7,15 +7,16 @@ import {Aqua} from "@1inch/aqua/src/Aqua.sol";
 
 import {FundingIndex} from "../src/FundingIndex.sol";
 import {KeelFundingReceiver} from "../src/KeelFundingReceiver.sol";
-import {KeelSwap} from "../src/KeelSwap.sol";
 import {KeelSwapVMRouter} from "../src/swapvm/KeelSwapVMRouter.sol";
 import {KeelFundingProgram} from "../src/swapvm/KeelFundingProgram.sol";
 import {MockUSDC} from "../test/mocks/MockUSDC.sol";
 
 /// @title Deploy — Keel on Base mainnet
-/// @notice Deploys our own pieces (custom SwapVM router + program + settlement core + CRE funding
-///         receiver) and **reuses the canonical, already-deployed Aqua + USDC** on Base mainnet;
-///         writes `deployments.json`. Real funds/gas — fund the deployer EOA with ETH first:
+/// @notice Deploys our own pieces (custom SwapVM router + program + CRE funding receiver + funding
+///         latch) and **reuses the canonical, already-deployed Aqua + USDC** on Base mainnet;
+///         writes `deployments.json`. Settlement runs entirely over Aqua via the `_fundingSettle`
+///         opcode — there is no custodial settlement contract. Real funds/gas — fund the deployer
+///         EOA with ETH first:
 ///
 ///   forge script script/Deploy.s.sol:Deploy \
 ///     --rpc-url $BASE_RPC_URL --private-key $PRIVATE_KEY --broadcast
@@ -32,7 +33,6 @@ contract Deploy is Script {
         address aqua;
         FundingIndex fundingIndex;
         KeelFundingReceiver receiver;
-        KeelSwap keelSwap;
         KeelSwapVMRouter router;
         KeelFundingProgram program;
     }
@@ -54,7 +54,6 @@ contract Deploy is Script {
         d.receiver = new KeelFundingReceiver(d.fundingIndex, forwarder, relayer);
         d.fundingIndex.setForwarder(address(d.receiver));
 
-        d.keelSwap = new KeelSwap(d.usdc, address(d.fundingIndex));
         d.router = new KeelSwapVMRouter(d.aqua, "Keel", "1.0.0");
         d.program = new KeelFundingProgram(d.aqua);
     }
@@ -82,7 +81,6 @@ contract Deploy is Script {
         vm.serializeAddress(k, "Aqua", d.aqua);
         vm.serializeAddress(k, "FundingIndex", address(d.fundingIndex));
         vm.serializeAddress(k, "KeelFundingReceiver", address(d.receiver));
-        vm.serializeAddress(k, "KeelSwap", address(d.keelSwap));
         vm.serializeAddress(k, "KeelSwapVMRouter", address(d.router));
         string memory json = vm.serializeAddress(k, "KeelFundingProgram", address(d.program));
         vm.writeJson(json, "./deployments.json");

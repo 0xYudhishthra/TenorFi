@@ -20,14 +20,12 @@ contract DeployTest is Test {
         assertGt(d.usdc.code.length, 0, "usdc");
         assertGt(address(d.fundingIndex).code.length, 0, "fundingIndex");
         assertGt(address(d.receiver).code.length, 0, "receiver");
-        assertGt(address(d.keelSwap).code.length, 0, "keelSwap");
         assertGt(d.aqua.code.length, 0, "aqua");
         assertGt(address(d.router).code.length, 0, "router");
         assertGt(address(d.program).code.length, 0, "program");
 
-        // settlement core wired to the right collateral token + funding index
-        assertEq(address(d.keelSwap.collateralToken()), d.usdc);
-        assertEq(address(d.keelSwap.fundingIndex()), address(d.fundingIndex));
+        // the settlement router points at the canonical Aqua it was constructed with
+        assertEq(address(d.router.AQUA()), d.aqua);
 
         // the CRE receiver is the index's authorized writer, and the receiver knows its
         // forwarder + relayer + target index

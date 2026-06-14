@@ -149,11 +149,10 @@ export default function CreatePositionPage() {
     setDepositTxHash(null);
     setOpenTxHash(null);
 
-    // The subscriber posts ZERO collateral — they only approve Aqua to pull the
-    // premium. `perpCollateralUsd` funds the Hyperliquid perp margin via LI.FI;
-    // it is sized to the reserve coverage magnitude for the demo. Both are
-    // decimal USDC strings (>0) as keel-api requires.
-    const collateral = Math.max(1, prelock).toString();
+    // On-chain legs use a SMALL test amount — the notional shown above is the
+    // illustrative position size; the demo only bridges/approves a few USDC the
+    // connected wallet can actually afford. Both are decimal USDC strings (>0).
+    const collateral = "2";
 
     let result: HedgeQuote;
     try {
@@ -183,26 +182,36 @@ export default function CreatePositionPage() {
     setSigning(false);
     goStep(3);
     setSubmitting(true);
+    const openReq = result.open ? legTx(result.open) : null;
+    const depositReq = legTx(result.deposit);
+
+    // PRIMARY leg — activate the TenorFi subscription = approve Aqua on Base.
+    // Cheap, instant, amount-independent: this is the meaningful on-chain
+    // "subscribe" action and the one we lead with so the first prompt succeeds.
     try {
-      const depositReq = legTx(result.deposit);
-      if (depositReq) {
-        const hash = await sendLeg(depositReq);
-        setDepositTxHash(hash);
-      } else {
-        setSubmitError("Deposit leg has no signable transaction.");
+      if (!openReq) {
+        setSubmitError("Activate leg unavailable — set RESERVE_ADDRESS on keel-api.");
         setSubmitting(false);
         return;
       }
-
-      // Activate (approve Aqua) leg — only if keel-api built it.
-      const openReq = result.open ? legTx(result.open) : null;
-      if (openReq) {
-        const hash = await sendLeg(openReq);
-        setOpenTxHash(hash);
-      }
+      setOpenTxHash(await sendLeg(openReq));
     } catch (err) {
       setSubmitError(
-        err instanceof Error ? err.message : "Wallet rejected or the transaction failed.",
+        "Activate (approve Aqua) failed or was rejected: " +
+          (err instanceof Error ? err.message : String(err)),
+      );
+      setSubmitting(false);
+      return;
+    }
+
+    // SECONDARY leg — bridge perp margin to Hyperliquid via LI.FI. Needs USDC in
+    // the wallet + meets the bridge minimum; a failure here does NOT undo the
+    // subscription activated above (the activate tx hash still shows as proof).
+    try {
+      if (depositReq) setDepositTxHash(await sendLeg(depositReq));
+    } catch {
+      setSubmitError(
+        "Perp-margin bridge didn't go through (wallet USDC / bridge minimum) — your subscription is still activated above.",
       );
     } finally {
       setSubmitting(false);

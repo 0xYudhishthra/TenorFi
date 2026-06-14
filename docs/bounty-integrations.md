@@ -29,6 +29,96 @@ flowchart LR
 
 ---
 
+## Prize submission answers (ETHGlobal form)
+
+> Copy-paste-ready answers for the per-prize submission form. Code links point at `main`.
+
+### 1inch — Build an Aqua App ($5,000)
+
+**How are you using this Protocol / API?**
+We built a **custom SwapVM instruction**, `_fundingSettle` — a *modified SwapVM opcode / our own
+instruction* (the track's highest-scoring path) — that turns a "swap" into a periodic funding-rate
+settlement: a sophisticated DeFi position (a funding-rate swap / interest-rate-swap-for-perps), not a
+spot trade. It reads an on-chain funding index, nets fixed-vs-realized, clamps to a per-period cap,
+and settles over **Aqua virtual balances** so collateral stays live in the user's wallet. We deployed
+our **own SwapVM router** (the opcode appended to Aqua's opcode set) on Base mainnet, reusing the
+canonical Aqua. Pull Aqua out and there is no settlement venue.
+
+**Why we qualify (maps to the requirements):** ✅ *modifies SwapVM / defines a custom instruction*
+(scored higher); ✅ *on-chain token transfers demonstrated* — real USDC moves through the opcode on a
+**Base-mainnet fork** and on the **live deployment** (`test_deployedStack_settlesRealCREValue`), plus a
+Base-mainnet deploy; ✅ *positions shown via tests + scripts* (38 Foundry tests, `Ship`/`Settle`); ✅
+*proper multi-commit git history* (no single final-day commit).
+
+**Link to the line of code:**
+- Custom opcode: `https://github.com/0xYudhishthra/keel/blob/main/packages/contracts/src/swapvm/FundingSettle.sol#L53`
+- Opcode registration into Aqua's set: `https://github.com/0xYudhishthra/keel/blob/main/packages/contracts/src/swapvm/KeelOpcodes.sol#L29`
+- Our SwapVM router (`Simulator, SwapVM, KeelOpcodes`): `https://github.com/0xYudhishthra/keel/blob/main/packages/contracts/src/swapvm/KeelSwapVMRouter.sol#L15`
+- Live on Base mainnet: router `0x3a526bdb3249512580760A703248c3E0700766E9`, program `0x5A6f0876EDe0797ee126a32a616875862BfcF6EB` (Basescan-verified).
+
+**Ease of use (1–10): 6.** Aqua + SwapVM are powerful but the custom-opcode path is sparsely
+documented — we read the source to find the `SwapVM(aqua, name, version)` constructor (3 args), the
+`TakerTraits` struct fields, how to append an opcode via an `_opcodes()` override at a stable index,
+and the `amountIn`/`amountOut` register + `taker = msg.sender` semantics.
+
+**Additional feedback for the sponsor.** A worked "custom opcode" example (beyond AMM/options) would
+have saved hours — specifically: registering a new instruction, the `ProgramBuilder`/`MakerTraits`/
+`TakerTraits` flow end-to-end, that the opcode can compute `amountIn` (not just `amountOut`), and that
+`ctx.query.taker` is the caller. The virtual-balance model is excellent; just surface it in docs.
+
+### Chainlink — Best workflow with CRE ($6,000)
+
+**How are you using this Protocol / API?**
+A **CRE workflow** fetches BTC funding from the Hyperliquid API on a cron, reaches **DON median
+consensus**, scales it to a signed 1e18 per-period rate, and writes `(period, value)` on-chain through
+the **KeystoneForwarder** into our `IReceiver` consumer (`onReport`) → `FundingIndex`. It's the
+oracle the entire settlement reads — external API → DON consensus → on-chain state change, verified
+with a real on-chain write.
+
+**Link to the line of code:**
+- Workflow (fetch → consensus → `writeReport`): `https://github.com/0xYudhishthra/keel/blob/main/packages/cre/keel-funding/workflow.ts#L170`
+- On-chain consumer `onReport`: `https://github.com/0xYudhishthra/keel/blob/main/packages/contracts/src/KeelFundingReceiver.sol#L85`
+- Live on Base mainnet: receiver `0x7b7Ca2269f865C3448015173D433CcD7782aF582`, index `0x545f162204A92CEbeb12AA0A4AaDF777d6905005`; verified write at period 494834.
+
+**Why we qualify (maps to the requirements):** ✅ *a CRE Workflow used as the orchestration layer* —
+it's the oracle the whole settlement reads; ✅ *integrates a blockchain with an external API* (Base ←
+Hyperliquid funding API); ✅ *a successful CRE CLI simulation **and** a real on-chain write* (period
+494834); ✅ *meaningfully used* — without the funding number there is nothing to settle.
+
+**Ease of use (1–10): 8.** The `@chainlink/cre-sdk` workflow model (cron trigger → HTTP capability →
+`ConsensusAggregationByFields` → `writeReport`) was clean, and the canonical `IReceiver` consumer
+pattern mapped directly to our contract.
+
+**Additional feedback for the sponsor.** More end-to-end examples of `writeReport` ABI-encoding into a
+custom consumer (the `(period, value)` decode side) and of non-price external data sources (we use a
+venue funding rate) would help. Documenting the bun-based toolchain expectations up front would also
+smooth setup.
+
+### LI.FI — Most Innovative Composer Application ($4,000)
+
+**How are you using this Protocol / API?**
+A **LI.FI Composer Flow** is the one-click on-ramp and a **core part** of the product: it bridges the
+user's USDC from any chain to Base and, in a single signature, composes the whole onboarding into one
+Flow — fund the Hyperliquid perp leg **and** activate the TenorFi position — so the user opens both
+legs of the delta-neutral hedge in one transaction instead of assembling it by hand across two venues.
+Composer isn't cosmetic: the hedge only works if both legs open together.
+
+**Why we qualify (maps to the requirements):** ✅ *integrates LI.FI Composer as a core part*; ✅
+*working demo + open-source code* (`packages/lifi`); ✅ clearly explained (the dual-leg Flow). *(Also a
+fit for the **Agentic Workflows $4,000** track — our MCP agent uses Composer as its execution layer.)*
+
+**Link to the line of code:**
+- Composer flow: `https://github.com/0xYudhishthra/keel/blob/main/packages/lifi/src/execute.ts`
+- Hedge/onboarding orchestration: `https://github.com/0xYudhishthra/keel/blob/main/packages/lifi/src/hedge.ts`
+
+**Ease of use (1–10):** _(integration lead to confirm.)_
+
+**Additional feedback for the sponsor.** _(integration lead to confirm — note whether a single
+Composer Flow can chain an arbitrary contract call alongside the HyperCore deposit, or if two
+sequenced calls were needed.)_
+
+---
+
 ## 1inch — Build an Aqua App ($5,000)
 
 **What we build.** A custom **SwapVM instruction `_fundingSettle`** that turns a swap into one

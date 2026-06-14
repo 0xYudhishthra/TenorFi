@@ -51,9 +51,9 @@ Base-mainnet deploy; ✅ *positions shown via tests + scripts* (38 Foundry tests
 *proper multi-commit git history* (no single final-day commit).
 
 **Link to the line of code:**
-- Custom opcode: `https://github.com/0xYudhishthra/keel/blob/main/packages/contracts/src/swapvm/FundingSettle.sol#L53`
-- Opcode registration into Aqua's set: `https://github.com/0xYudhishthra/keel/blob/main/packages/contracts/src/swapvm/KeelOpcodes.sol#L29`
-- Our SwapVM router (`Simulator, SwapVM, KeelOpcodes`): `https://github.com/0xYudhishthra/keel/blob/main/packages/contracts/src/swapvm/KeelSwapVMRouter.sol#L15`
+- Custom opcode: `https://github.com/0xYudhishthra/TenorFi/blob/main/packages/contracts/src/swapvm/FundingSettle.sol#L53`
+- Opcode registration into Aqua's set: `https://github.com/0xYudhishthra/TenorFi/blob/main/packages/contracts/src/swapvm/KeelOpcodes.sol#L29`
+- Our SwapVM router (`Simulator, SwapVM, KeelOpcodes`): `https://github.com/0xYudhishthra/TenorFi/blob/main/packages/contracts/src/swapvm/KeelSwapVMRouter.sol#L15`
 - Live on Base mainnet: router `0x3a526bdb3249512580760A703248c3E0700766E9`, program `0x5A6f0876EDe0797ee126a32a616875862BfcF6EB` (Basescan-verified).
 
 **Ease of use (1–10): 6.** Aqua + SwapVM are powerful but the custom-opcode path is sparsely
@@ -76,8 +76,8 @@ oracle the entire settlement reads — external API → DON consensus → on-cha
 with a real on-chain write.
 
 **Link to the line of code:**
-- Workflow (fetch → consensus → `writeReport`): `https://github.com/0xYudhishthra/keel/blob/main/packages/cre/keel-funding/workflow.ts#L170`
-- On-chain consumer `onReport`: `https://github.com/0xYudhishthra/keel/blob/main/packages/contracts/src/KeelFundingReceiver.sol#L85`
+- Workflow (fetch → consensus → `writeReport`): `https://github.com/0xYudhishthra/TenorFi/blob/main/packages/cre/keel-funding/workflow.ts#L170`
+- On-chain consumer `onReport`: `https://github.com/0xYudhishthra/TenorFi/blob/main/packages/contracts/src/KeelFundingReceiver.sol#L85`
 - Live on Base mainnet: receiver `0x7b7Ca2269f865C3448015173D433CcD7782aF582`, index `0x545f162204A92CEbeb12AA0A4AaDF777d6905005`; verified write at period 494834.
 
 **Why we qualify (maps to the requirements):** ✅ *a CRE Workflow used as the orchestration layer* —
@@ -108,8 +108,8 @@ Composer isn't cosmetic: the hedge only works if both legs open together.
 fit for the **Agentic Workflows $4,000** track — our MCP agent uses Composer as its execution layer.)*
 
 **Link to the line of code:**
-- Composer flow: `https://github.com/0xYudhishthra/keel/blob/main/packages/lifi/src/execute.ts`
-- Hedge/onboarding orchestration: `https://github.com/0xYudhishthra/keel/blob/main/packages/lifi/src/hedge.ts`
+- Composer flow: `https://github.com/0xYudhishthra/TenorFi/blob/main/packages/lifi/src/execute.ts`
+- Hedge/onboarding orchestration: `https://github.com/0xYudhishthra/TenorFi/blob/main/packages/lifi/src/hedge.ts`
 
 **Ease of use (1–10):** _(integration lead to confirm.)_
 

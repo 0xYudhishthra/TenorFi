@@ -39,56 +39,50 @@ contract Settle is Script {
     uint256 internal constant RATE_ONE = 1e18;
 
     function run() external {
-        uint256 pk = vm.envUint("PRIVATE_KEY"); // the bound taker (the party owed this period)
-        address taker = vm.addr(pk);
-        address maker = vm.envAddress("MAKER"); // the order's maker (payer)
-        int256 fixedRate = vm.envOr("FIXED_RATE", int256(8_561_643_835_616)); // must match the shipped order
+        uint256 pk = vm.envUint("PRIVATE_KEY"); // the subscriber (the bound taker)
+        address subscriber = vm.addr(pk);
+        address maker = vm.envAddress("MAKER"); // the insurance reserve (order maker)
+        int256 fixedRate = vm.envOr("FIXED_RATE", int256(8_333_333_333_333)); // 7.3% APR/hr; match the order
         uint256 cap = vm.envOr("CAP", uint256(4e16));
         uint256 notional = vm.envOr("NOTIONAL", uint256(100e6));
-        bool makerPaysAbove = vm.envOr("MAKER_PAYS_ABOVE", true);
 
-        // Rebuild the exact shipped order (buildProgram is pure; counterparty = the taker = us).
-        ISwapVM.Order memory order = KeelFundingProgram(PROGRAM)
-            .buildProgram(
-                maker,
-                FUNDING_INDEX,
-                fixedRate,
-                cap,
-                notional,
-                PERIOD_SECONDS,
-                taker,
-                makerPaysAbove
-            );
+        // Rebuild the exact shipped subscription order (buildProgram is pure; subscriber = us).
+        ISwapVM.Order memory order = KeelFundingProgram(PROGRAM).buildProgram(
+            maker, FUNDING_INDEX, fixedRate, cap, notional, PERIOD_SECONDS, subscriber, USDC
+        );
 
         uint256 period = block.timestamp / PERIOD_SECONDS;
         (int256 r, bool set) = FundingIndex(FUNDING_INDEX).getFundingIndex(period);
         require(set, "funding index not set for the current period yet");
 
-        // Preview what this leg pays the taker this period (mirror of the opcode math).
         int256 diff = r - fixedRate;
         if (diff > int256(cap)) diff = int256(cap);
         if (diff < -int256(cap)) diff = -int256(cap);
-        int256 owed =
-            makerPaysAbove ? (diff > 0 ? diff : int256(0)) : (diff < 0 ? -diff : int256(0));
-        uint256 net = (uint256(owed) * notional) / RATE_ONE;
 
         console2.log("period:", period);
         console2.log("realized R (1e18):", r);
-        console2.log("net to taker (USDC 1e6):", net);
 
-        // A 0-net (wrong-direction) settlement would just waste gas / may revert — skip it.
-        if (net == 0) {
-            console2.log(
-                "this leg pays 0 for the current period (other leg's direction) - skipping"
-            );
+        if (diff == 0) {
+            console2.log("R == F: nothing to settle this period");
             return;
         }
 
         vm.startBroadcast(pk);
-        KeelSwapVMRouter(ROUTER).swap(order, POS, USDC, 0, _takerData(taker));
+        if (diff > 0) {
+            // Coverage (R > F): the reserve pays the subscriber. tokenIn = marker (0), tokenOut = USDC.
+            uint256 coverage = (uint256(diff) * notional) / RATE_ONE;
+            console2.log("coverage paid to subscriber (USDC 1e6):", coverage);
+            KeelSwapVMRouter(ROUTER).swap(order, POS, USDC, 0, _takerData(subscriber));
+        } else {
+            // Premium (R < F): pulled from the subscriber's wallet. tokenIn = USDC, amount = premium.
+            // (The subscriber must have approved USDC to Aqua once at subscribe time.)
+            uint256 premium = (uint256(-diff) * notional) / RATE_ONE;
+            console2.log("premium pulled from subscriber wallet (USDC 1e6):", premium);
+            KeelSwapVMRouter(ROUTER).swap(order, USDC, POS, premium, _takerData(subscriber));
+        }
         vm.stopBroadcast();
 
-        console2.log("settled period for taker:", taker);
+        console2.log("settled period for subscriber:", subscriber);
     }
 
     function _takerData(address taker) internal pure returns (bytes memory) {

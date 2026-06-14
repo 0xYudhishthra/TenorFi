@@ -8,21 +8,24 @@ import {ProgramBuilder, Program} from "@1inch/swap-vm/test/utils/ProgramBuilder.
 import {KeelOpcodes} from "./KeelOpcodes.sol";
 import {FundingSettleArgsBuilder} from "./FundingSettle.sol";
 
-/// @title KeelFundingProgram — builds the maker's funding-settlement order
-/// @notice Program = a single `_fundingSettle` instruction. The maker (LP / payer) ships a
-///         strategy holding {positionToken, USDC}; settlement is executed as a swap with
-///         tokenIn = positionToken (amountIn = 0, hence `allowZeroAmountIn`), tokenOut = USDC
-///         (amountOut = the netted funding payment the opcode computes). Mirrors
-///         `AquaAMM.buildProgram`. Extends `KeelOpcodes` so `_fundingSettle` is in `_opcodes()`
-///         at the same index the router dispatches.
+/// @title KeelFundingProgram — builds the reserve's funding-subscription order
+/// @notice Program = a single `_fundingSettle` instruction serving BOTH directions of one
+///         subscription. The maker (the insurance reserve) ships a strategy holding {positionToken,
+///         USDC}. Each period the bound `subscriber` (taker) settles:
+///           - coverage (`R > F`): swap tokenIn = positionToken (amountIn 0), tokenOut = USDC — the
+///             opcode sets `amountOut`, paid from the reserve's balance to the subscriber;
+///           - premium (`R < F`): swap tokenIn = USDC, tokenOut = positionToken — the opcode sets
+///             `amountIn`, pulled from the subscriber's wallet into the reserve.
+///         `allowZeroAmountIn` covers the coverage direction; the premium direction has `amountIn > 0`.
+///         Extends `KeelOpcodes` so `_fundingSettle` is in `_opcodes()` at the dispatch index.
 contract KeelFundingProgram is KeelOpcodes {
     using ProgramBuilder for Program;
 
     constructor(address aqua) KeelOpcodes(aqua) {}
 
-    /// @param maker         The payer for this leg (LP for the maker-pays-above leg; hedger for the mirror).
-    /// @param counterparty  The only address allowed to take this order (the receiver of this leg).
-    /// @param makerPaysAbove true: maker pays when realized > fixed; false: when realized < fixed.
+    /// @param maker           The insurance reserve (covers funding, collects premium).
+    /// @param subscriber      The only address allowed to settle this subscription (the taker).
+    /// @param settlementToken USDC — pulled in (premium) / paid out (coverage).
     function buildProgram(
         address maker,
         address fundingIndex,
@@ -30,14 +33,14 @@ contract KeelFundingProgram is KeelOpcodes {
         uint256 cap,
         uint256 notional,
         uint256 periodSeconds,
-        address counterparty,
-        bool makerPaysAbove
+        address subscriber,
+        address settlementToken
     ) external pure returns (ISwapVM.Order memory) {
         Program memory program = ProgramBuilder.init(_opcodes());
         bytes memory bytecode = program.build(
             _fundingSettle,
             FundingSettleArgsBuilder.build(
-                fundingIndex, fixedRate, cap, notional, periodSeconds, counterparty, makerPaysAbove
+                fundingIndex, fixedRate, cap, notional, periodSeconds, subscriber, settlementToken
             )
         );
 
@@ -47,7 +50,7 @@ contract KeelFundingProgram is KeelOpcodes {
                 receiver: address(0),
                 shouldUnwrapWeth: false,
                 useAquaInsteadOfSignature: true,
-                allowZeroAmountIn: true, // settlement: receiver pays 0 of the position token
+                allowZeroAmountIn: true, // coverage direction: taker provides 0 of the position token
                 hasPreTransferInHook: false,
                 hasPostTransferInHook: false,
                 hasPreTransferOutHook: false,

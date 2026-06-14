@@ -34,7 +34,7 @@ contract Ship is Script {
     address internal constant FUNDING_INDEX = 0x545f162204A92CEbeb12AA0A4AaDF777d6905005;
     address internal constant USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
 
-    uint256 internal constant PERIOD_SECONDS = 3600; // must match the deployed CRE config
+    uint256 internal constant PERIOD_SECONDS = 60; // per-minute (demo); must match the CRE config
 
     function run() external {
         uint256 pk = vm.envUint("PRIVATE_KEY"); // the reserve wallet
@@ -56,10 +56,11 @@ contract Ship is Script {
         require(IERC20(USDC).balanceOf(reserve) >= collateral, "reserve USDC balance < COLLATERAL");
         require(hedger != reserve, "hedger must differ from reserve");
 
-        // Reserve leg: pays the hedger when realized > fixed.
+        // Subscription order (one order, both directions): reserve covers funding when R>F, pulls the
+        // premium from the subscriber's wallet when R<F. `hedger` = the bound subscriber.
         ISwapVM.Order memory order = KeelFundingProgram(PROGRAM)
             .buildProgram(
-                reserve, FUNDING_INDEX, fixedRate, cap, notional, PERIOD_SECONDS, hedger, true
+                reserve, FUNDING_INDEX, fixedRate, cap, notional, PERIOD_SECONDS, hedger, USDC
             );
 
         vm.startBroadcast(pk);
@@ -108,7 +109,7 @@ contract Ship is Script {
         vm.serializeUint(k, "notional", notional);
         vm.serializeUint(k, "periodSeconds", PERIOD_SECONDS);
         vm.serializeUint(k, "collateral", collateral);
-        string memory json = vm.serializeBool(k, "makerPaysAbove", true);
+        string memory json = vm.serializeAddress(k, "settlementToken", USDC);
         vm.writeJson(json, "./order-params.json");
     }
 }

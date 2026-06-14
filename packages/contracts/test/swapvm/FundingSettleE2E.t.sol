@@ -13,27 +13,28 @@ import {KeelFundingProgram} from "../../src/swapvm/KeelFundingProgram.sol";
 import {MockFundingIndex} from "./MockFundingIndex.sol";
 import {MockERC20} from "./MockERC20.sol";
 
-/// @notice End-to-end: a real funding settlement executes through `_fundingSettle` and MOVES USDC.
-///         LP (maker) ships {POS, USDC}; the order is bound to the hedger (taker); tokenIn = POS
-///         (amountIn = 0), tokenOut = USDC (amountOut = net). R > F leg (makerPaysAbove).
+/// @notice End-to-end over real Aqua: the **subscription** model as ONE order, both directions, with
+///         **zero subscriber collateral**. The reserve (maker) ships a USDC coverage balance; the
+///         subscriber (taker) settles each period:
+///           - coverage (`R > F`): subscriber receives `(R−F)·N` from the reserve — posts nothing;
+///           - premium (`R < F`): `(F−R)·N` is pulled **from the subscriber's wallet** via Aqua —
+///             nothing pre-locked, just an approval.
 contract FundingSettleE2ETest is Test {
     uint256 internal constant ONE = 1e18;
-    uint256 internal constant PERIOD_SECONDS = 120;
+    uint256 internal constant PERIOD_SECONDS = 60; // per-minute (demo)
     int256 internal constant F = int256(ONE / 100); // 1%
     uint256 internal constant CAP = (ONE * 4) / 100; // 4%
     uint256 internal constant N = 50_000 * 1e6; // 50,000 USDC notional
-    int256 internal constant R = int256((ONE * 3) / 100); // realized 3% > F
-    uint256 internal constant NET = 1_000 * 1e6; // (3%-1%) * 50,000 = 1,000 USDC
 
     Aqua internal aqua;
     KeelSwapVMRouter internal router;
     KeelFundingProgram internal program;
     MockFundingIndex internal idx;
     MockERC20 internal usdc;
-    MockERC20 internal pos;
+    MockERC20 internal pos; // position-marker token
 
-    address internal lp = makeAddr("lp");
-    address internal hedger = makeAddr("hedger");
+    address internal reserve = makeAddr("reserve");
+    address internal subscriber = makeAddr("subscriber");
 
     function setUp() public {
         aqua = new Aqua();
@@ -41,20 +42,20 @@ contract FundingSettleE2ETest is Test {
         program = new KeelFundingProgram(address(aqua));
         idx = new MockFundingIndex();
         usdc = new MockERC20("USD Coin", "USDC", 6);
-        pos = new MockERC20("Keel Position", "KPOS", 18);
-
-        usdc.mint(lp, 5_000 * 1e6);
-        pos.mint(lp, ONE);
+        pos = new MockERC20("TenorFi Position", "TPOS", 18);
 
         vm.warp(1_000_000);
-        idx.setFundingIndex(block.timestamp / PERIOD_SECONDS, R);
     }
 
-    function _ship() internal returns (ISwapVM.Order memory order) {
-        // maker = LP, counterparty (taker) = hedger, maker pays when realized > fixed
-        order = program.buildProgram(lp, address(idx), F, CAP, N, PERIOD_SECONDS, hedger, true);
+    function _order() internal view returns (ISwapVM.Order memory) {
+        return program.buildProgram(reserve, address(idx), F, CAP, N, PERIOD_SECONDS, subscriber, address(usdc));
+    }
 
-        vm.startPrank(lp);
+    // The reserve ships its USDC coverage balance (and a marker) into Aqua.
+    function _shipReserve(ISwapVM.Order memory order, uint256 coverage) internal {
+        usdc.mint(reserve, coverage);
+        pos.mint(reserve, ONE);
+        vm.startPrank(reserve);
         usdc.approve(address(aqua), type(uint256).max);
         pos.approve(address(aqua), type(uint256).max);
         address[] memory tokens = new address[](2);
@@ -62,7 +63,7 @@ contract FundingSettleE2ETest is Test {
         tokens[1] = address(usdc);
         uint256[] memory amounts = new uint256[](2);
         amounts[0] = ONE;
-        amounts[1] = 5_000 * 1e6;
+        amounts[1] = coverage;
         aqua.ship(address(router), abi.encode(order), tokens, amounts);
         vm.stopPrank();
     }
@@ -92,123 +93,65 @@ contract FundingSettleE2ETest is Test {
         );
     }
 
-    function test_settlementMovesUSDC_RAboveF() public {
-        ISwapVM.Order memory order = _ship();
-        uint256 lpBefore = usdc.balanceOf(lp);
-        uint256 hedgerBefore = usdc.balanceOf(hedger);
+    // R > F: the reserve covers (R−F)·N → subscriber receives it, posts NOTHING.
+    function test_coverage_RAboveF_subscriberPostsNothing() public {
+        int256 r = int256((ONE * 3) / 100); // 3% > F
+        uint256 net = uint256(r - F) * N / ONE; // 2% * 50k = 1,000 USDC
+        ISwapVM.Order memory order = _order();
+        _shipReserve(order, 5_000 * 1e6);
+        idx.setFundingIndex(block.timestamp / PERIOD_SECONDS, r);
 
-        vm.prank(hedger);
-        router.swap(order, address(pos), address(usdc), 0, _takerData(hedger));
+        assertEq(usdc.balanceOf(subscriber), 0, "subscriber starts with no USDC / no collateral");
+        vm.prank(subscriber);
+        router.swap(order, address(pos), address(usdc), 0, _takerData(subscriber));
 
-        assertEq(usdc.balanceOf(lp), lpBefore - NET, "LP pays net");
-        assertEq(usdc.balanceOf(hedger), hedgerBefore + NET, "hedger receives net");
+        assertEq(usdc.balanceOf(subscriber), net, "subscriber received coverage");
     }
 
+    // R < F: the premium (F−R)·N is pulled from the subscriber's WALLET — nothing pre-locked.
+    function test_premium_RBelowF_pulledFromWallet() public {
+        int256 r = 0; // below F
+        uint256 premium = uint256(F - r) * N / ONE; // 1% * 50k = 500 USDC
+        ISwapVM.Order memory order = _order();
+        _shipReserve(order, 5_000 * 1e6);
+        idx.setFundingIndex(block.timestamp / PERIOD_SECONDS, r);
+
+        // Subscriber only holds USDC in their wallet + approves the router (the transferFrom spender)
+        // — posts no collateral.
+        usdc.mint(subscriber, premium);
+        vm.prank(subscriber);
+        usdc.approve(address(router), type(uint256).max);
+
+        uint256 reserveBefore = usdc.balanceOf(reserve); // 0 (all shipped)
+        vm.prank(subscriber);
+        router.swap(order, address(usdc), address(pos), premium, _takerData(subscriber));
+
+        assertEq(usdc.balanceOf(subscriber), 0, "premium pulled from the subscriber's wallet");
+        assertEq(usdc.balanceOf(reserve), reserveBefore + premium, "premium collected by the reserve");
+    }
+
+    // Same period can't be settled twice.
     function test_doubleSettleReverts() public {
-        ISwapVM.Order memory order = _ship();
-        vm.prank(hedger);
-        router.swap(order, address(pos), address(usdc), 0, _takerData(hedger));
-
-        vm.prank(hedger);
+        int256 r = int256((ONE * 3) / 100);
+        ISwapVM.Order memory order = _order();
+        _shipReserve(order, 5_000 * 1e6);
+        idx.setFundingIndex(block.timestamp / PERIOD_SECONDS, r);
+        vm.prank(subscriber);
+        router.swap(order, address(pos), address(usdc), 0, _takerData(subscriber));
+        vm.prank(subscriber);
         vm.expectRevert(FundingSettle.AlreadySettled.selector);
-        router.swap(order, address(pos), address(usdc), 0, _takerData(hedger));
+        router.swap(order, address(pos), address(usdc), 0, _takerData(subscriber));
     }
 
-    // A non-counterparty cannot take the order and steal the LP's payout (audit #2).
-    function test_strangerCannotTake() public {
-        ISwapVM.Order memory order = _ship();
+    // Only the bound subscriber can settle — no one else can intercept coverage.
+    function test_strangerCannotSettle() public {
+        int256 r = int256((ONE * 3) / 100);
+        ISwapVM.Order memory order = _order();
+        _shipReserve(order, 5_000 * 1e6);
+        idx.setFundingIndex(block.timestamp / PERIOD_SECONDS, r);
         address stranger = makeAddr("stranger");
         vm.prank(stranger);
         vm.expectRevert(FundingSettle.UnauthorizedTaker.selector);
         router.swap(order, address(pos), address(usdc), 0, _takerData(stranger));
-    }
-
-    // No-default, the Aqua way: a maker who ships exactly one period's worst-case max (cap × notional)
-    // always covers the worst possible period; a second worst-case period it never funded reverts at
-    // the Aqua layer (insufficient virtual balance) rather than creating unbacked debt. The cap is the
-    // per-period bound, the shipped virtual balance is the collateral, and Aqua can never push tokens
-    // the maker did not ship — so a credited taker is always fully backed and no side can be overdrawn.
-    function test_noDefault_shipFloorCoversWorstCase_underfundedPeriodReverts() public {
-        uint256 floor = (CAP * N) / ONE; // cap × notional = 2,000 USDC = one period's max
-
-        // LP ships EXACTLY the no-default floor (not the generous 5,000 of _ship()).
-        ISwapVM.Order memory order =
-            program.buildProgram(lp, address(idx), F, CAP, N, PERIOD_SECONDS, hedger, true);
-        vm.startPrank(lp);
-        usdc.approve(address(aqua), type(uint256).max);
-        pos.approve(address(aqua), type(uint256).max);
-        address[] memory tokens = new address[](2);
-        tokens[0] = address(pos);
-        tokens[1] = address(usdc);
-        uint256[] memory amounts = new uint256[](2);
-        amounts[0] = ONE;
-        amounts[1] = floor;
-        aqua.ship(address(router), abi.encode(order), tokens, amounts);
-        vm.stopPrank();
-
-        // Period A: a spike far past the cap clamps to cap and settles to EXACTLY the floor — the
-        // worst possible period is fully covered, draining the shipped balance to zero.
-        uint256 pA = block.timestamp / PERIOD_SECONDS;
-        idx.setFundingIndex(pA, int256((ONE * 50) / 100)); // 50% → clamps to 4% cap
-        uint256 hedgerBefore = usdc.balanceOf(hedger);
-        vm.prank(hedger);
-        router.swap(order, address(pos), address(usdc), 0, _takerData(hedger));
-        assertEq(usdc.balanceOf(hedger), hedgerBefore + floor, "worst-case period fully covered");
-
-        // Period B: the maker never funded a second worst-case period. Settlement reverts (no tokens
-        // to push) instead of creating unbacked debt — the no-default guarantee.
-        vm.warp(block.timestamp + PERIOD_SECONDS);
-        uint256 pB = block.timestamp / PERIOD_SECONDS;
-        idx.setFundingIndex(pB, int256((ONE * 50) / 100));
-        vm.prank(hedger);
-        vm.expectRevert();
-        router.swap(order, address(pos), address(usdc), 0, _takerData(hedger));
-    }
-
-    // Two shipped orders per position: a Keel position is the LP-pays-above leg AND the hedger-pays-below
-    // mirror leg. Here we ship BOTH and settle the R < F window through real Aqua — the mirror leg moves
-    // (F - R) * N from the hedger (maker) to the LP (bound taker). Proves the full two-order model
-    // end-to-end, not just the harness unit (`test_makerPaysBelow_RBelowF_pays`).
-    function test_twoLegs_RBelowF_mirrorLegPaysLP() public {
-        uint256 floor = (CAP * N) / ONE; // 2,000 USDC per leg
-
-        // Leg 1 — LP ships the pays-above order (bound taker = hedger).
-        ISwapVM.Order memory lpLeg =
-            program.buildProgram(lp, address(idx), F, CAP, N, PERIOD_SECONDS, hedger, true);
-        address[] memory tokens = new address[](2);
-        tokens[0] = address(pos);
-        tokens[1] = address(usdc);
-        uint256[] memory amounts = new uint256[](2);
-        amounts[0] = ONE;
-        amounts[1] = floor;
-        vm.startPrank(lp);
-        usdc.approve(address(aqua), type(uint256).max);
-        pos.approve(address(aqua), type(uint256).max);
-        aqua.ship(address(router), abi.encode(lpLeg), tokens, amounts);
-        vm.stopPrank();
-
-        // Leg 2 — the hedger ships the mirror pays-below order (bound taker = LP).
-        usdc.mint(hedger, floor);
-        pos.mint(hedger, ONE);
-        ISwapVM.Order memory hedgerLeg =
-            program.buildProgram(hedger, address(idx), F, CAP, N, PERIOD_SECONDS, lp, false);
-        vm.startPrank(hedger);
-        usdc.approve(address(aqua), type(uint256).max);
-        pos.approve(address(aqua), type(uint256).max);
-        aqua.ship(address(router), abi.encode(hedgerLeg), tokens, amounts);
-        vm.stopPrank();
-
-        // R < F window: the mirror leg pays (F - R) * N from hedger → LP through real Aqua.
-        vm.warp(block.timestamp + PERIOD_SECONDS);
-        idx.setFundingIndex(block.timestamp / PERIOD_SECONDS, 0); // R = 0 < F
-        uint256 expected = uint256(F) * N / ONE; // (F - 0) * N = 500 USDC
-        uint256 lpBefore = usdc.balanceOf(lp);
-        uint256 hedgerBefore = usdc.balanceOf(hedger);
-
-        vm.prank(lp);
-        router.swap(hedgerLeg, address(pos), address(usdc), 0, _takerData(lp));
-
-        assertEq(usdc.balanceOf(lp), lpBefore + expected, "LP receives (F-R)*N on the mirror leg");
-        assertEq(usdc.balanceOf(hedger), hedgerBefore - expected, "hedger pays the mirror leg");
     }
 }

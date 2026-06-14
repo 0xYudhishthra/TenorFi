@@ -49,9 +49,9 @@ contract DeployTest is Test {
                 int256(1e16),
                 4e16,
                 50_000e6,
-                3600, // periodSeconds — matches the deployed CRE config
+                60, // periodSeconds (per-minute demo)
                 address(0xCAFE),
-                true
+                d.usdc // settlement token
             );
         assertEq(order.maker, address(0xBEEF));
         assertGt(order.data.length, 0, "program bytecode");

@@ -84,7 +84,7 @@ contract BaseMainnetForkTest is Test {
         idx.setFundingIndex(block.timestamp / PERIOD_SECONDS, R);
 
         ISwapVM.Order memory order =
-            program.buildProgram(lp, address(idx), F, CAP, N, PERIOD_SECONDS, hedger, true);
+            program.buildProgram(lp, address(idx), F, CAP, N, PERIOD_SECONDS, hedger, USDC);
 
         vm.startPrank(lp);
         IERC20(USDC).approve(AQUA, type(uint256).max);

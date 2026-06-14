@@ -124,7 +124,7 @@ export default function PositionDetailPage({
               ))}
               <p style={{ fontSize: 12.5, color: "var(--fg-tertiary)", marginTop: 12, lineHeight: 1.5 }}>
                 Funding is capped per period and collateral is pre-locked to cover the
-                maximum — no default is possible. Agent proposes, human decides.
+                maximum — no default is possible. You confirm what moves money.
               </p>
             </div>
           )}

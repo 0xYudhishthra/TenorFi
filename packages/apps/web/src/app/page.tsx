@@ -2,7 +2,6 @@ import Link from "next/link";
 import HeroA from "@/components/landing/HeroA";
 import Problem from "@/components/landing/Problem";
 import Reveal from "@/components/landing/Reveal";
-import Mcp from "@/components/landing/Mcp";
 import Team from "@/components/landing/Team";
 
 export default function Home() {
@@ -35,17 +34,19 @@ export default function Home() {
           <Reveal>
             <div className="create">
               <div className="create-left">
-                <span className="eyebrow">In one conversation</span>
+                <span className="eyebrow">In a few clicks</span>
                 <h2 className="display">Create a position.</h2>
                 <p className="lead" style={{ marginTop: 14, maxWidth: "40ch" }}>
-                  Tell the TenorFi agent what you want. It assembles both legs of the hedge —
-                  you confirm with a single signature.
+                  Pick the market you&rsquo;re hedging and a standing fixed-rate offer.
+                  TenorFi assembles both legs of the hedge — you confirm with a single
+                  signature.
                 </p>
                 <div className="create-steps">
                   <div className="cstep">
                     <span className="n">1</span>
                     <p>
-                      <b>Ask.</b> &ldquo;Long BTC and fix my funding rate.&rdquo;
+                      <b>Pick your market.</b> Choose what you&rsquo;re hedging and your
+                      notional.
                     </p>
                   </div>
                   <div className="cstep">
@@ -80,10 +81,10 @@ export default function Home() {
                 />
                 <div className="mini-quote">
                   <div className="q">
-                    <b>You:</b> Create a long on BTC and fix the funding rate.
+                    <b>3 standing offers</b> — pick one to lock your rate.
                   </div>
-                  <div className="q" style={{ marginTop: 10 }}>
-                    <b>TenorFi:</b> Here are 3 standing offers. Pick one to lock.
+                  <div className="q" style={{ marginTop: 6 }}>
+                    Each is a fixed rate plus its max coverage.
                   </div>
                 </div>
                 <div style={{ display: "grid", gap: 10 }}>
@@ -140,10 +141,10 @@ export default function Home() {
           <div className="steps">
             <Reveal className="step card">
               <div className="num">01</div>
-              <h3>Connect the agent</h3>
+              <h3>Pick your market</h3>
               <p>
-                Connect TenorFi&rsquo;s MCP to Claude, Cursor, or Cline. No dashboards to learn
-                — you talk to it.
+                Choose the perp you&rsquo;re hedging and your notional. No dashboards to
+                learn.
               </p>
             </Reveal>
             <Reveal className="step card" delay={0.08}>
@@ -175,9 +176,9 @@ export default function Home() {
             </svg>
             <div style={{ fontSize: "14.5px", color: "var(--fg-secondary)" }}>
               <b style={{ color: "var(--fg-primary)" }}>At the brink:</b> if collateral runs
-              low, TenorFi doesn&rsquo;t close blindly. The agent prepares the call —{" "}
+              low, TenorFi doesn&rsquo;t close blindly. It surfaces the call —{" "}
               <b style={{ color: "var(--fg-primary)" }}>you</b> confirm close, re-match, or
-              add collateral. Agent proposes, human decides.
+              add collateral. You decide what moves money.
             </div>
           </Reveal>
         </div>
@@ -306,15 +307,12 @@ export default function Home() {
             />
             <Feature
               title="Close or continue"
-              body="At the brink, the agent proposes three paths. You confirm the one that moves money."
+              body="At the brink, TenorFi surfaces three paths. You confirm the one that moves money."
               icon={<path d="M9 12l2 2 4-4M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />}
             />
           </Reveal>
         </div>
       </section>
-
-      {/* ---- MCP / Developers ---- */}
-      <Mcp />
 
       {/* ---- FAQ ---- */}
       <section
@@ -348,8 +346,8 @@ export default function Home() {
               a="Settlement is in USDC on Base mainnet. Funding data is read from Hyperliquid's BTC-PERP. LI.FI brings your USDC from any chain in a single flow."
             />
             <Faq
-              q="Does an AI move my money?"
-              a="No. There's no AI in the settlement math, so there's no hallucination where money moves. The agent prepares transactions; you confirm every one. At the brink, the decision that moves money is always human."
+              q="Who controls my funds?"
+              a="You do. TenorFi is non-custodial and you sign every transaction that moves money. Settlement runs on a deterministic on-chain opcode against a Chainlink funding feed — no discretionary party can touch your collateral."
             />
           </Reveal>
         </div>

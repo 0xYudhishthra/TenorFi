@@ -61,7 +61,7 @@ export default function Footer() {
         }}
       >
         <span>Built for ETHGlobal New York 2026 · Settlement in USDC on Base mainnet</span>
-        <span>Non-custodial · Agent proposes, human decides</span>
+        <span>Non-custodial · You confirm every transaction</span>
       </div>
 
       <style>{`

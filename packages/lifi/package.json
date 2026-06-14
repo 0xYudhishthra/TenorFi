@@ -25,6 +25,7 @@
   "dependencies": {
     "@lifi/compose-spec": "^0.1.0",
     "@lifi/composer-sdk": "^0.1.0",
+    "@lifi/sdk": "^4.0.0",
     "viem": "^2.52.2"
   },
   "devDependencies": {

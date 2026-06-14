@@ -75,9 +75,12 @@ importers:
       '@lifi/composer-sdk':
         specifier: ^0.1.0
         version: 0.1.0(@lifi/compose-spec@0.1.0)(typescript@6.0.3)(zod@4.4.3)
+      '@lifi/sdk':
+        specifier: ^4.0.0
+        version: 4.0.0
       viem:
         specifier: ^2.52.2
-        version: 2.52.2(typescript@6.0.3)(zod@3.25.76)
+        version: 2.52.2(typescript@6.0.3)(zod@4.4.3)
     devDependencies:
       '@types/node':
         specifier: ^25.9.3
@@ -96,7 +99,7 @@ packages:
     version: 0.1.0
 
   '@1inch/aqua@https://codeload.github.com/1inch/aqua/tar.gz/ec7e8cf8cb2ba1131b670848d4757cd528014e80':
-    resolution: {gitHosted: true, tarball: https://codeload.github.com/1inch/aqua/tar.gz/ec7e8cf8cb2ba1131b670848d4757cd528014e80}
+    resolution: {tarball: https://codeload.github.com/1inch/aqua/tar.gz/ec7e8cf8cb2ba1131b670848d4757cd528014e80}
     version: 0.0.6
 
   '@1inch/solidity-utils@6.8.0':
@@ -643,6 +646,12 @@ packages:
     engines: {node: '>=18'}
     peerDependencies:
       '@lifi/compose-spec': 0.1.0
+
+  '@lifi/sdk@4.0.0':
+    resolution: {integrity: sha512-4xhwdc1cDgNv99slKG31dKzCPmZmJJFaxO4nayxIsaggeBZnG2VIie2x+cMS882fslKXGKMaoXGkP76/havwEA==}
+
+  '@lifi/types@17.82.1':
+    resolution: {integrity: sha512-n1FDyQtREj8RO/6XTeC1B2fq39t3CUlm7b+TeiMKQ6pLRpovwAZFhhv7dZIuAqr9FJvXc3cKVciyrR3L5IthmQ==}
 
   '@metamask/abi-utils@2.0.4':
     resolution: {integrity: sha512-StnIgUB75x7a7AgUhiaUZDpCsqGp7VkNnZh2XivXkJ6mPkE83U8ARGQj5MbRis7VJY8BC5V1AbB1fjdh0hupPQ==}
@@ -1409,7 +1418,7 @@ packages:
     engines: {node: '>= 0.4'}
 
   forge-std@https://codeload.github.com/foundry-rs/forge-std/tar.gz/8e40513d678f392f398620b3ef2b418648b33e89:
-    resolution: {gitHosted: true, tarball: https://codeload.github.com/foundry-rs/forge-std/tar.gz/8e40513d678f392f398620b3ef2b418648b33e89}
+    resolution: {tarball: https://codeload.github.com/foundry-rs/forge-std/tar.gz/8e40513d678f392f398620b3ef2b418648b33e89}
     version: 1.11.0
 
   form-data@4.0.6:
@@ -3225,6 +3234,12 @@ snapshots:
       - typescript
       - zod
 
+  '@lifi/sdk@4.0.0':
+    dependencies:
+      '@lifi/types': 17.82.1
+
+  '@lifi/types@17.82.1': {}
+
   '@metamask/abi-utils@2.0.4':
     dependencies:
       '@metamask/superstruct': 3.2.1
@@ -3560,11 +3575,6 @@ snapshots:
   abitype@1.0.8(typescript@5.9.3)(zod@3.25.76):
     optionalDependencies:
       typescript: 5.9.3
-      zod: 3.25.76
-
-  abitype@1.2.3(typescript@6.0.3)(zod@3.25.76):
-    optionalDependencies:
-      typescript: 6.0.3
       zod: 3.25.76
 
   abitype@1.2.3(typescript@6.0.3)(zod@4.4.3):
@@ -4720,21 +4730,6 @@ snapshots:
 
   os-tmpdir@1.0.2: {}
 
-  ox@0.14.29(typescript@6.0.3)(zod@3.25.76):
-    dependencies:
-      '@adraffy/ens-normalize': 1.11.1
-      '@noble/ciphers': 1.3.0
-      '@noble/curves': 1.9.1
-      '@noble/hashes': 1.8.0
-      '@scure/bip32': 1.7.0
-      '@scure/bip39': 1.6.0
-      abitype: 1.2.3(typescript@6.0.3)(zod@3.25.76)
-      eventemitter3: 5.0.1
-    optionalDependencies:
-      typescript: 6.0.3
-    transitivePeerDependencies:
-      - zod
-
   ox@0.14.29(typescript@6.0.3)(zod@4.4.3):
     dependencies:
       '@adraffy/ens-normalize': 1.11.1
@@ -5173,23 +5168,6 @@ snapshots:
       ws: 8.18.3
     optionalDependencies:
       typescript: 5.9.3
-    transitivePeerDependencies:
-      - bufferutil
-      - utf-8-validate
-      - zod
-
-  viem@2.52.2(typescript@6.0.3)(zod@3.25.76):
-    dependencies:
-      '@noble/curves': 1.9.1
-      '@noble/hashes': 1.8.0
-      '@scure/bip32': 1.7.0
-      '@scure/bip39': 1.6.0
-      abitype: 1.2.3(typescript@6.0.3)(zod@3.25.76)
-      isows: 1.0.7(ws@8.20.1)
-      ox: 0.14.29(typescript@6.0.3)(zod@3.25.76)
-      ws: 8.20.1
-    optionalDependencies:
-      typescript: 6.0.3
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate

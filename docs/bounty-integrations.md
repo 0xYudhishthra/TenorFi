@@ -2,7 +2,7 @@
 
 > How each sponsor tech is integrated, in detail — with diagrams and code. **The test every
 > integration must pass:** *pull it out and the product breaks.*
-> **Target bounties: 1inch · Chainlink · LI.FI.** Deploy chain: **Base Sepolia.** Funding data
+> **Target bounties: 1inch · Chainlink · LI.FI.** Deploy chain: **Base mainnet.** Funding data
 > source: **Hyperliquid** (read by CRE).
 
 ## Summary
@@ -16,7 +16,7 @@
 ```mermaid
 flowchart LR
     LIFI["LI.FI Composer<br/>cross-chain USDC in"] --> KEEL
-    CRE["Chainlink CRE<br/>Hyperliquid funding → on-chain"] -->|funding index| KEEL
+    CRE["Chainlink CRE<br/>Hyperliquid funding → KeystoneForwarder → KeelFundingReceiver.onReport → on-chain"] -->|funding index| KEEL
     KEEL["1inch Aqua / SwapVM<br/>_fundingSettle opcode settles each period"]
     KEEL -->|USDC| OUT["hedger ↔ LP"]
 ```
@@ -86,21 +86,38 @@ Qualification: onchain token transfer in the demo ✓ · incremental git history
 ## Chainlink — Best workflow with CRE ($6,000, up to 3×$2k)
 
 **What we build.** A CRE workflow that reads BTC funding from the **Hyperliquid API**, reaches DON
-consensus, and writes it on-chain via `FundingIndex.setFundingIndex(period, value)` (through the
-KeystoneForwarder). There is no on-chain funding-rate oracle — without CRE there is no number to
-settle against.
+consensus, and writes it on-chain via the canonical consumer path — the KeystoneForwarder calls
+`KeelFundingReceiver.onReport`, which decodes `(period, value)` and forwards to
+`FundingIndex.setFundingIndex(period, value)`. There is no on-chain funding-rate oracle — without CRE
+there is no number to settle against.
 
 ```mermaid
 flowchart LR
     HL["Hyperliquid API<br/>BTC funding (hourly)"] -->|HTTP fetch| CRE["CRE workflow"]
     CRE -->|DON consensus| FWD["KeystoneForwarder"]
-    FWD -->|setFundingIndex period, R| IDX["FundingIndex (Base Sepolia)"]
+    FWD -->|"onReport(metadata, report)"| RECV["KeelFundingReceiver (Base mainnet)"]
+    RECV -->|setFundingIndex period, R| IDX["FundingIndex"]
     IDX --> K["KeelSwap.settle"]
     IDX --> O["_fundingSettle opcode"]
     IDX --> M["MCP get_funding"]
 ```
 
-**The on-chain interface** (already shipped, `packages/contracts/src/FundingIndex.sol`):
+**The consumer** (`packages/contracts/src/KeelFundingReceiver.sol`) implements Chainlink's
+`IReceiver` + ERC-165. The forwarder calls `onReport`, which decodes `(period, value)` from the
+report and writes the latch; it is idempotent (skips an already-set period) and also accepts an
+owner-rotatable EOA `relayer` as the live-demo fallback.
+
+```solidity
+function onReport(bytes calldata, bytes calldata report) external override {
+    if (msg.sender != forwarder && msg.sender != relayer) revert NotAuthorized();
+    (uint256 period, int256 value) = abi.decode(report, (uint256, int256));
+    if (fundingIndex.isSet(period)) { emit ReportSkipped(period); return; }
+    fundingIndex.setFundingIndex(period, value);
+}
+```
+
+**The on-chain latch** (already shipped, `packages/contracts/src/FundingIndex.sol`) — the receiver is
+wired in as its `forwarder`:
 
 ```solidity
 function setFundingIndex(uint256 period, int256 value) external onlyForwarder {
@@ -115,7 +132,7 @@ function setFundingIndex(uint256 period, int256 value) external onlyForwarder {
 - `value = R = AFR` (actual funding rate), **signed `int256`, scale `1e18`, PER-PERIOD** — funding can go negative.
 - **Annualized → per-period conversion happens OFF-CHAIN, in the CRE workflow.** The contract never sees an annualized rate.
 - `period = floor(unixSeconds / PERIOD_SECONDS)`, `PERIOD_SECONDS = 120` for the demo. Everyone (contract, keeper, UI, MCP) uses this exact formula.
-- Set the contract's `onlyForwarder` to the CRE KeystoneForwarder (rotatable via `setForwarder`).
+- Set the latch's `onlyForwarder` to the `KeelFundingReceiver` (rotatable via `setForwarder`); the receiver in turn gates `onReport` to the CRE KeystoneForwarder (+ the relayer fallback).
 
 **Hyperliquid funding source** (verify schema on the day):
 - `POST https://api.hyperliquid-testnet.xyz/info`
@@ -131,13 +148,15 @@ system — `KeelSwap`, the `_fundingSettle` opcode, and the MCP's `get_funding`.
 API (Hyperliquid) ✓ · a successful CRE CLI simulation qualifies (they deploy it live for you) — land
 **≥1 real on-chain write** ✓ · makes an on-chain state change (not a UI read) ✓.
 
-**Build steps (Axel).** (1) Base Sepolia RPC + confirm KeystoneForwarder address; get the
-deployed `FundingIndex` from `deployments.json`. (2) Write the workflow: HTTP fetch HL BTC funding →
-DON consensus → convert annualized→per-period → `setFundingIndex`. (3) Simulate via CRE CLI. (4) Land
-one real on-chain write; hand the tx hash to the submission.
+**Build steps (Axel).** (1) Base mainnet RPC + confirm CRE supports Base mainnet and its
+KeystoneForwarder address; get the deployed `KeelFundingReceiver` + `FundingIndex` from
+`deployments.json`. (2) Write the workflow: HTTP fetch HL BTC funding → DON consensus → convert
+annualized→per-period → encode `(period, value)` → `writeReport` targeting the receiver. (3) Simulate
+via CRE CLI. (4) Land one real on-chain write; hand the tx hash to the submission.
 
-**Fallback.** If the DON is flaky by the checkpoint, an **EOA relayer** posts the real API-derived
-per-period index to `setFundingIndex` for the live loop — but keep ≥1 real CRE write for the bounty.
+**Fallback.** If the DON is flaky by the checkpoint, the authorized **EOA relayer** calls
+`KeelFundingReceiver.onReport` with the real API-derived per-period index for the live loop — same
+code path, no contract change — but keep ≥1 real CRE write for the bounty.
 
 ---
 
@@ -150,7 +169,7 @@ leg and (b) opens the Keel swap (`KeelSwap.open`). The MCP uses Composer as its 
 
 ```mermaid
 flowchart TB
-    USER["USDC on any chain"] -->|LI.FI Composer Flow| BRIDGE["bridge to Base Sepolia / HyperCore"]
+    USER["USDC on any chain"] -->|LI.FI Composer Flow| BRIDGE["bridge to Base mainnet / HyperCore"]
     BRIDGE --> DEP["deposit collateral → Hyperliquid (perp leg)"]
     BRIDGE --> OPEN["KeelSwap.open (hedge leg)"]
 ```
@@ -166,5 +185,5 @@ single confirmation. **Open item (integration lead):** confirm a single Flow can
 
 - **Never claim "first"** — Rho is live (see design-doc §12). We compete on Aqua-native execution +
   live collateral + the Ethena demo.
-- **Real vs scripted:** the lock + USDC settlements are real (testnet); the Ethena crash is a
+- **Real vs scripted:** the lock + USDC settlements are real (Base mainnet); the Ethena crash is a
   *replay* of real historical funding on a slider.

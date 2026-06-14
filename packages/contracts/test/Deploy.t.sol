@@ -7,16 +7,18 @@ import {ISwapVM} from "@1inch/swap-vm/src/interfaces/ISwapVM.sol";
 import {Deploy} from "../script/Deploy.s.sol";
 
 /// @notice Exercises the deploy script's `deploy()` (no broadcast) and asserts the stack is
-///         deployed and wired — a dry-run before the real Ethereum Sepolia broadcast.
+///         deployed and wired — a dry-run before the real Base mainnet broadcast.
 contract DeployTest is Test {
     function test_deployWiring() public {
         Deploy dep = new Deploy();
         address forwarder = address(0xCAFE);
-        Deploy.Deployed memory d = dep.deploy(forwarder);
+        address relayer = address(0xBEE5);
+        Deploy.Deployed memory d = dep.deploy(forwarder, relayer);
 
         // every contract has code
         assertGt(address(d.usdc).code.length, 0, "usdc");
         assertGt(address(d.fundingIndex).code.length, 0, "fundingIndex");
+        assertGt(address(d.receiver).code.length, 0, "receiver");
         assertGt(address(d.keelSwap).code.length, 0, "keelSwap");
         assertGt(address(d.aqua).code.length, 0, "aqua");
         assertGt(address(d.router).code.length, 0, "router");
@@ -25,7 +27,13 @@ contract DeployTest is Test {
         // settlement core wired to the right collateral token + funding index
         assertEq(address(d.keelSwap.collateralToken()), address(d.usdc));
         assertEq(address(d.keelSwap.fundingIndex()), address(d.fundingIndex));
-        assertEq(d.fundingIndex.forwarder(), forwarder);
+
+        // the CRE receiver is the index's authorized writer, and the receiver knows its
+        // forwarder + relayer + target index
+        assertEq(d.fundingIndex.forwarder(), address(d.receiver));
+        assertEq(address(d.receiver.fundingIndex()), address(d.fundingIndex));
+        assertEq(d.receiver.forwarder(), forwarder);
+        assertEq(d.receiver.relayer(), relayer);
 
         // the program builder produces a non-empty funding-settlement order
         ISwapVM.Order memory order = d.program

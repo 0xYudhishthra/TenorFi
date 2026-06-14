@@ -43,9 +43,12 @@ contract Ship is Script {
         uint256 notional = vm.envOr("NOTIONAL", uint256(100e6)); // 100 USDC default
         uint256 collateral = vm.envOr("COLLATERAL", uint256(10e6)); // 10 USDC default ship
         // The quoted fixed rate (FFR) is a per-order value — re-quote by shipping a new order at a
-        // new FIXED_RATE; existing positions keep their locked rate. Defaults: 1% FFR, 4% cap.
-        int256 fixedRate = vm.envOr("FIXED_RATE", int256(1e16));
-        uint256 cap = vm.envOr("CAP", uint256(4e16));
+        // new FIXED_RATE; existing positions keep their locked rate (no redeploy, no global setter).
+        // PLACEHOLDER: ~7.5% APR expressed per-hour in WAD (7.5e16 / 8760 ≈ 8.56e12), the same
+        // per-period frame as the realized funding from CRE. Change later via the FIXED_RATE env.
+        int256 fixedRate = vm.envOr("FIXED_RATE", int256(8_561_643_835_616));
+        uint256 cap = vm.envOr("CAP", uint256(4e16)); // 4% per-period clamp
+        require(fixedRate > 0, "fixedRate must be positive");
 
         uint256 floor = (cap * notional) / 1e18; // one period's worst-case = the no-default minimum
         require(collateral >= floor, "COLLATERAL below cap*notional floor");

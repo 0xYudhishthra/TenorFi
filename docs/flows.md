@@ -86,6 +86,23 @@ signature. *Agent proposes, the human decides.*
 
 ## B. System flow (what happens under the hood)
 
+### B.0 — What's live (build against this)
+
+The intersection between the CRE write path and the Aqua read path is a **single shared contract,
+`FundingIndex`** — CRE writes `(period → R)`, the `_fundingSettle` opcode reads it. Build against:
+
+| Thing | Value |
+|---|---|
+| `FundingIndex` (the seam) | `0x545f162204A92CEbeb12AA0A4AaDF777d6905005` (Base mainnet) — **the Aqua order's `fundingIndex` must point here** |
+| `KeelFundingReceiver` (CRE consumer) | `0x7b7Ca2269f865C3448015173D433CcD7782aF582` |
+| `PERIOD_SECONDS` | **3600** (must match in the order) |
+| Settlement token (`tokenOut`) | canonical Base USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` |
+| Aqua (canonical, reused) | `0x499943E74FB0cE105688beeE8Ef2ABec5D936d31` |
+| Aqua settlement layer (router + program + position token) | **not deployed yet** → `script/DeployAqua.s.sol` (points orders at the live `FundingIndex`; does **not** redeploy it) |
+
+The CRE write path is **live and verified on-chain** (real Hyperliquid funding written into `FundingIndex`).
+What remains is deploying the Aqua settlement layer and wiring open/ship + a keeper (see §D).
+
 ### B.1 — Onboarding (one user signature)
 
 ```mermaid
@@ -96,8 +113,12 @@ flowchart TB
     KEEL --> AQUA["Collateral held as Aqua virtual balances<br/>→ keeps earning yield while it insures"]
 ```
 
-*LI.FI **deposits** into both legs; the perp order itself is fired by the MCP via the Hyperliquid API in
-the same flow — LI.FI does not place the order.*
+*Both legs are funded with **real USDC**: LI.FI bridges the user's USDC cross-chain and **deposits** into
+both — the Hyperliquid perp margin **and** the Keel leg (shipped into Aqua). The perp order itself is fired
+by the MCP via the Hyperliquid API in the same flow — LI.FI does not place the order. Because settlement is
+real USDC, the `AFR > FFR` payout can **literally** top up the HL margin (no token mismatch).*
+*Open item (integration lead): confirm the Composer Flow can chain the Aqua `ship` call after the bridge in
+one Flow; else two sequenced calls behind one MCP confirmation.*
 
 ### B.2 — The oracle (each period)
 
@@ -109,10 +130,14 @@ flowchart LR
     RECV -->|setFundingIndex| IDX["FundingIndex (write-once)"]
 ```
 
-- The CRE workflow converts the venue's annualized funding to a **per-period** rate **off-chain**; the
-  contract only ever sees `R` as a **signed `1e18` per-period** value.
-- `period = floor(unixSeconds / PERIOD_SECONDS)`, `PERIOD_SECONDS = 120` in the demo. Everyone (contract,
-  keeper, MCP) uses this exact formula.
+- The CRE workflow reads Hyperliquid's `funding` (already an **hourly** fractional rate) and scales it to a
+  **signed `1e18` per-period** value **off-chain** (`toScaled1e18`); the contract only ever sees `R` as that
+  per-period `1e18` value — never an annualized rate.
+- `period = floor(unixSeconds / PERIOD_SECONDS)`. **The live deployment uses `PERIOD_SECONDS = 3600`** (the
+  hourly funding window) — this is the value baked into the deployed CRE config, so the Aqua order **must be
+  built with the same `3600`** or the opcode reads a different period bucket than CRE wrote. *(To compress
+  the demo, lower `PERIOD_SECONDS` on **both** the CRE config and the order together; the relayer fallback
+  can then latch periods quickly.)*
 - The index is **write-once** per period (immutable once it has settled real cashflow). Only the
   `KeelFundingReceiver` may write it; it accepts an owner-rotatable **EOA relayer** as a liveness fallback
   if the DON is flaky.
@@ -139,9 +164,13 @@ The settlement amount is `net = clamp(realized − fixed, ±cap) × notional`:
 counterparty**: because SwapVM is one-directional (maker → taker), a Keel policy is implemented as **two
 mirror orders** — one pays when `realized > fixed` (`makerPaysAbove = true`), the other when `realized <
 fixed`. Each order pays `0` outside its own direction, so no side is ever debited the wrong way, and each
-order reverts (`UnauthorizedTaker`) if anyone but the agreed counterparty tries to take it. On close,
-balances are paid out **pull-over-push**: each party calls `withdraw()` independently (resilient to a
-USDC blacklist freezing one side).
+order reverts (`UnauthorizedTaker`) if anyone but the agreed counterparty tries to take it.
+
+**Tokens at settlement:** the swap's `tokenOut` is **canonical Base USDC** `0x8335…2913` (real USDC — the
+token the Base-mainnet fork test moves); `tokenIn` is a non-USDC **position-marker** ERC20 (amountIn 0, so
+SwapVM's `tokenIn != tokenOut` invariant holds). Collateral is shipped into Aqua as a **virtual balance**
+and only the netted USDC is pulled/pushed at settlement, so it stays in-wallet until the moment it moves.
+*(An early `MockUSDC 0x3A51…c6e8` was deployed but is superseded — settlement is real USDC.)*
 
 ### No default, by design
 

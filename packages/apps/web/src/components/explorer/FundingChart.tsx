@@ -10,15 +10,20 @@ const PAD_B = 18;
 
 export default function FundingChart({
   onHover,
+  series,
 }: {
   onHover?: (value: number | null) => void;
+  /** Live AFR (%) series; falls back to the mock FUNDING24H when absent. */
+  series?: { hour: number; afr: number }[];
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const crossRef = useRef<SVGLineElement>(null);
   const dotRef = useRef<SVGCircleElement>(null);
 
+  const source = series && series.length > 1 ? series : FUNDING24H;
+
   const { data, line, area, grid } = useMemo(() => {
-    const data = FUNDING24H.map((d) => d.afr);
+    const data = source.map((d) => d.afr);
     const hi = Math.max(...data);
     const lo = Math.min(...data);
     const top = Math.ceil(hi / 10) * 10;
@@ -35,7 +40,7 @@ export default function FundingChart({
     for (let g = bot; g <= top; g += 10) grid.push({ y: Y(g), label: g });
 
     return { data, X, Y, line, area, grid, bot, top };
-  }, []);
+  }, [source]);
 
   const Xf = (i: number) => (i / (data.length - 1)) * W;
   const Yf = (v: number) => {

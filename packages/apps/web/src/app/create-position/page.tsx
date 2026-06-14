@@ -12,8 +12,11 @@ import {
   type Offer,
 } from "@/lib/tenorfi-data";
 import { useWallet, truncateAddress } from "@/lib/wallet";
+import { quoteHedge, type HedgeQuote } from "@/lib/api";
 
 const CAP = 0.04; // per-period funding clamp → pre-locked collateral = cap × notional
+// Base mainnet — where the user funds the hedge from.
+const BASE_CHAIN_ID = 8453;
 const commas = (n: number) => n.toLocaleString("en-US");
 const parseNum = (s: string) => parseInt(String(s).replace(/[^0-9]/g, ""), 10) || 0;
 
@@ -35,6 +38,10 @@ export default function CreatePositionPage() {
   const [offer, setOffer] = useState<Offer | null>(null);
   const [signing, setSigning] = useState(false);
   const [float, setFloat] = useState(41.7);
+  // Real hedge quote returned by keel-api on confirm (legs + notes), or an
+  // error message if the API was unreachable. No fabricated tx hashes.
+  const [quote, setQuote] = useState<HedgeQuote | null>(null);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
 
   const { address, isOnBase, isConnecting, hasWallet, connect, switchToBase } = useWallet();
   const walletReady = Boolean(address) && isOnBase;
@@ -67,15 +74,37 @@ export default function CreatePositionPage() {
     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const confirm = () => {
-    // Require a connected wallet on Base before the (simulated) subscribe.
-    // The real on-chain subscribe is handled by the LI.FI Composer onboarding.
-    if (!walletReady) return;
+  const confirm = async () => {
+    // Require a connected wallet on Base before subscribing. Wallet logic lives
+    // in useWallet() and is untouched here — we only read the address.
+    if (!walletReady || !address) return;
     setSigning(true);
-    window.setTimeout(() => {
+    setQuote(null);
+    setQuoteError(null);
+
+    // The pre-locked collateral is what TenorFi locks per period; we fund the
+    // perp leg with the same magnitude for the demo. Both are decimal USDC
+    // strings (>0) as keel-api requires.
+    const collateral = Math.max(1, prelock).toString();
+    try {
+      // Real two-leg quote from keel-api. The API never signs; it returns
+      // unsigned LI.FI legs. The open (KeelSwap) leg is skipped until the
+      // contract is wired — surfaced via `notes`.
+      const result = await quoteHedge({
+        fromAddress: address as `0x${string}`,
+        fromChain: BASE_CHAIN_ID,
+        perpCollateralUsd: collateral,
+        keelCollateralUsd: collateral,
+      });
+      setQuote(result);
+    } catch (err) {
+      setQuoteError(
+        err instanceof Error ? err.message : "keel-api unreachable — quote unavailable",
+      );
+    } finally {
       setSigning(false);
       goStep(3);
-    }, 1100);
+    }
   };
 
   const stepState = (i: number) =>
@@ -362,15 +391,57 @@ export default function CreatePositionPage() {
                 <p className="hint" style={{ maxWidth: "42ch", margin: "10px auto 0" }}>
                   Your funding rate is fixed at{" "}
                   <span className="confetti-rate">{fmtPct(offer.fixedRate)}</span> for{" "}
-                  {tenor} days. Both legs are live. Net funding cost stays pinned — watch it
-                  settle hourly.
+                  {tenor} days. Net funding cost stays pinned — watch it settle hourly.
                 </p>
+
+                {/* Real hedge-quote result from keel-api (legs + notes). */}
+                <div className="rev" style={{ maxWidth: 520, margin: "20px auto 0", textAlign: "left" }}>
+                  <div className="r">
+                    <span className="k">Hedge quote</span>
+                    <span className="v">
+                      <span className={`badge ${quote && !quoteError ? "badge-up" : "badge-clay"}`} style={{ fontSize: 10 }}>
+                        <span className="dot" /> {quote && !quoteError ? "live · keel-api" : "demo · keel-api offline"}
+                      </span>
+                    </span>
+                  </div>
+                  {quote ? (
+                    <>
+                      <div className="r">
+                        <span className="k">① Perp deposit leg (LI.FI)</span>
+                        <span className="v" style={{ color: quote.deposit ? "var(--up)" : "var(--fg-tertiary)" }}>
+                          {quote.deposit ? "Built ✓" : "—"}
+                        </span>
+                      </div>
+                      <div className="r">
+                        <span className="k">② KeelSwap open leg</span>
+                        <span className="v" style={{ color: quote.open ? "var(--up)" : "var(--clay-600)" }}>
+                          {quote.open ? "Built ✓" : "Skipped"}
+                        </span>
+                      </div>
+                      {quote.notes.length > 0 && (
+                        <div className="r" style={{ alignItems: "flex-start" }}>
+                          <span className="k">Notes</span>
+                          <span className="v" style={{ textAlign: "right", fontSize: 12.5, color: "var(--fg-tertiary)", lineHeight: 1.5 }}>
+                            {quote.notes.map((n, i) => (
+                              <div key={i}>{n}</div>
+                            ))}
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="r">
+                      <span className="k">Status</span>
+                      <span className="v" style={{ fontSize: 12.5, color: "var(--fg-tertiary)", textAlign: "right" }}>
+                        {quoteError ?? "Quote unavailable"}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
                 <div className="flow-actions" style={{ justifyContent: "center" }}>
-                  <Link href="/explorer/42" className="btn btn-primary btn-lg">
-                    View position →
-                  </Link>
-                  <Link href="/explorer" className="btn btn-ghost btn-lg">
-                    Go to explorer
+                  <Link href="/explorer" className="btn btn-primary btn-lg">
+                    Go to explorer →
                   </Link>
                 </div>
               </div>

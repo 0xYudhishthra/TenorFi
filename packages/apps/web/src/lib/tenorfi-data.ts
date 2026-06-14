@@ -253,6 +253,123 @@ export const fmtUsdSigned = (n: number) =>
 // USD with cents, no forced sign, e.g. "$8.56"
 export const fmtUsdCents = (n: number) => "$" + n.toFixed(2);
 
+/* ============================================================================
+   LIVE-DATA ADAPTERS — keel-api → the mock-shaped structures above.
+   These let the UI feed real numbers through the EXACT SAME math/rendering as
+   the mock. Each adapter is pure (no fetch); the components fetch via
+   `src/lib/api.ts` and pass results here, falling back to the mock on error.
+   ============================================================================ */
+
+import type {
+  FundingHistoryEntry as ApiFundingHistoryEntry,
+  FundingSnapshot as ApiFundingSnapshot,
+  PositionSummary as ApiPositionSummary,
+} from "./api";
+
+/**
+ * Live funding history (hourly fractions) → the FUNDING24H shape
+ * (`{ hour, afr }`, afr = annualized funding rate in %). The API returns oldest-
+ * first; we take the most recent `count` rows. Each row's hourly fraction is
+ * annualized (× 24 × 365) and converted to a percent.
+ */
+export function fundingHistoryToAfr24h(
+  history: ApiFundingHistoryEntry[],
+  count = 24,
+): { hour: number; afr: number }[] {
+  const recent = history.slice(-count);
+  return recent.map((row, i) => ({
+    hour: i,
+    afr: +(row.fundingRate * 24 * 365 * 100).toFixed(1),
+  }));
+}
+
+/** Current annualized funding rate (%) from a live snapshot, for the AFR stat. */
+export function snapshotToAfrPct(snapshot: ApiFundingSnapshot): number {
+  return +(snapshot.annualized * 100).toFixed(1);
+}
+
+/**
+ * Realized hourly funding rates (%) straight from live history — the live
+ * replacement for `realizedHourlyRates`. Returns the most recent `count` hours.
+ * Used by `fundingBreakdownLive` so the fee table runs on real funding.
+ */
+export function realizedHourlyRatesFromHistory(
+  history: ApiFundingHistoryEntry[],
+  count: number,
+): number[] {
+  return history.slice(-count).map((row) => row.fundingRate * 100);
+}
+
+/**
+ * Live variant of `fundingBreakdown`: identical math, but the realized hourly
+ * funding rates come from the keel-api `/funding/:market/history` feed instead
+ * of the recentered mock series. The fee-table comparison
+ * (HL-charged vs TenorFi-net vs your-real-cost) is unchanged.
+ */
+export function fundingBreakdownLive(
+  position: Position,
+  history: ApiFundingHistoryEntry[],
+  periods = 6,
+): FundingBreakdownRow[] {
+  const rates = realizedHourlyRatesFromHistory(history, periods);
+  if (rates.length === 0) return fundingBreakdown(position, periods);
+
+  const fixedHourlyPct = position.fixedRate / (24 * 365);
+  const fixedUsd = hourlyUsd(fixedHourlyPct, position.notional);
+
+  return rates.map((realizedHourlyPct, i) => {
+    const hlUsd = hourlyUsd(realizedHourlyPct, position.notional);
+    const netUsd = hlUsd - fixedUsd;
+    const netAprPct = hourlyToApr(realizedHourlyPct - fixedHourlyPct);
+    return {
+      period: i + 1,
+      hlAprPct: hourlyToApr(realizedHourlyPct),
+      hlUsd,
+      netAprPct,
+      netUsd,
+      realAprPct: position.fixedRate,
+      realUsd: fixedUsd,
+    };
+  });
+}
+
+/**
+ * Map a live keel-api PositionSummary → the mock-shaped `Position` the explorer
+ * UI renders. The on-chain position record doesn't carry a fixed rate or
+ * notional in fiat terms (those are swap terms layered on later), so we derive
+ * display-friendly values from the collateral fields, keeping the existing UI
+ * contract intact. Numeric id is hashed from the string id for stable sorting.
+ */
+export function apiPositionToMock(p: ApiPositionSummary): Position {
+  const perp = Number(p.perpCollateralUsd) || 0;
+  const keel = Number(p.keelCollateralUsd) || 0;
+  // Notional shown ≈ total collateral committed across both legs.
+  const notional = Math.round(perp + keel);
+  const active = !["CLOSED", "FAILED"].includes(p.status);
+  // Stable small positive integer id from the string id for table sort/search.
+  let h = 0;
+  for (let i = 0; i < p.id.length; i++) h = (h * 31 + p.id.charCodeAt(i)) >>> 0;
+  const numId = h % 100000;
+  const maxCollateral = Math.max(1, Math.round(keel));
+  return {
+    id: numId,
+    hedger: p.hedger,
+    lp: p.hedger, // single-actor model on-chain today; reuse hedger for LP slot.
+    notional,
+    fixedRate: 0, // no fixed-rate term on the raw position record yet.
+    status: active ? "active" : "closed",
+    startedAt: new Date(p.createdAt).toISOString().slice(0, 10),
+    hedgerCollateral: active ? Math.round(perp) : 0,
+    lpCollateral: active ? Math.round(keel) : 0,
+    maxCollateral,
+  };
+}
+
+/** Convenience: map a whole live list → mock-shaped positions. */
+export function apiPositionsToMock(list: ApiPositionSummary[]): Position[] {
+  return list.map(apiPositionToMock);
+}
+
 /* ---- lookups ---- */
 export const getPosition = (id: number) => POSITIONS.find((p) => p.id === id);
 export const positionsByAddress = (addr: string) =>

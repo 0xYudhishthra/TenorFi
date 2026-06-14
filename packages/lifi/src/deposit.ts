@@ -1,37 +1,65 @@
-import { getQuote, type SDKClient } from "@lifi/sdk";
-import { CHAINS, createLifiClient, USDC, usdcFor } from "./client.js";
+import {
+  materialisers,
+  resources,
+  type ComposeCompileResult,
+  type ComposeSdk,
+  type SimulationPolicy,
+} from "@lifi/composer-sdk";
+import { CHAINS, createKeelComposeSdk, usdcFor } from "./client.js";
 
-export interface HyperCoreDepositParams {
-  /** Source chain id to bring USDC from (e.g. CHAINS.arbitrum). */
-  fromChain: number;
-  /** USDC amount in 6-decimal base units (e.g. "5000000" = 5 USDC). */
-  amount: string;
-  /** Address funding the deposit and receiving collateral on HyperCore. */
-  fromAddress: `0x${string}`;
-  /** USDC address on the source chain. Defaults from known chains. */
-  fromToken?: string;
+export interface PerpDepositParams {
+  /** Address funding the deposit; also the default sweep recipient. */
+  signer: `0x${string}`;
+  /** USDC amount in 6-decimal base units to route toward Hyperliquid. */
+  amount: bigint;
+  /** Source chain the flow runs on. Defaults to Base. */
+  fromChain?: number;
+  /** Destination chain to land USDC on for the HL deposit. Defaults to Arbitrum (HyperCore's bridge chain). */
+  toChain?: number;
+  fromToken?: `0x${string}`;
+  toToken?: `0x${string}`;
   /** Slippage as a fraction (e.g. 0.005 = 0.5%). */
   slippage?: number;
-  client?: SDKClient;
+  /**
+   * Where the bridged USDC lands. Defaults to the signer's own address so the
+   * user controls it for the Hyperliquid deposit + perp order (placed via the HL API).
+   */
+  recipient?: `0x${string}`;
+  simulationPolicy?: SimulationPolicy;
+  sdk?: ComposeSdk;
 }
 
 /**
- * Build a LI.FI quote that brings USDC from `fromChain` and deposits it into
- * Hyperliquid (HyperCore) — the perp-collateral leg of the hedge. Returns a
- * LiFiStep whose `transactionRequest` is the signable, executable transaction.
- * LI.FI only deposits collateral; the perp order is placed separately via the HL API.
+ * Build + compile a Composer flow that brings USDC and bridges it toward
+ * Hyperliquid (the perp-collateral leg). A single `lifi.swap` whose `resourceOut`
+ * lives on the destination chain crosses chains in one flow; the residual is
+ * swept to the recipient (the signer by default), where the Hyperliquid API
+ * finishes the HyperCore deposit and places the perp order.
+ *
+ * Composer never places the perp order (it's non-EVM); that stays on the HL API.
  */
-export async function buildHyperCoreDeposit(
-  params: HyperCoreDepositParams,
-): ReturnType<typeof getQuote> {
-  const client = params.client ?? createLifiClient();
-  return getQuote(client, {
-    fromChain: params.fromChain,
-    fromToken: params.fromToken ?? usdcFor(params.fromChain),
-    fromAddress: params.fromAddress,
-    fromAmount: params.amount,
-    toChain: CHAINS.hyperliquid,
-    toToken: USDC.hyperliquid,
-    slippage: params.slippage,
+export async function buildPerpDepositFlow(params: PerpDepositParams): Promise<ComposeCompileResult> {
+  const sdk = params.sdk ?? createKeelComposeSdk();
+  const fromChain = params.fromChain ?? CHAINS.base;
+  const toChain = params.toChain ?? CHAINS.arbitrum;
+  const fromToken = (params.fromToken ?? usdcFor(fromChain)) as `0x${string}`;
+  const toToken = (params.toToken ?? usdcFor(toChain)) as `0x${string}`;
+  const recipient = params.recipient ?? params.signer;
+
+  const builder = sdk.flow(fromChain, {
+    name: "keel-perp-deposit",
+    inputs: { amountIn: resources.erc20(fromToken, fromChain) },
+  });
+
+  builder.lifi.swap("bridge", {
+    bind: { amountIn: builder.inputs.amountIn },
+    config: { resourceOut: resources.erc20(toToken, toChain), slippage: params.slippage },
+  });
+
+  return builder.compile({
+    inputs: { amountIn: materialisers.directDeposit({ amount: params.amount }) },
+    signer: params.signer,
+    sweepTo: recipient,
+    simulationPolicy: params.simulationPolicy,
   });
 }

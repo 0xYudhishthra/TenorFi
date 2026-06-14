@@ -55,7 +55,7 @@ importers:
         version: 0.32.2(typescript@6.0.3)
       viem:
         specifier: ^2.52.2
-        version: 2.52.2(typescript@6.0.3)(zod@3.25.76)
+        version: 2.52.2(typescript@6.0.3)(zod@4.4.3)
     devDependencies:
       '@types/node':
         specifier: ^25.9.3
@@ -69,9 +69,12 @@ importers:
 
   packages/lifi:
     dependencies:
-      '@lifi/sdk':
-        specifier: ^4.0.0
-        version: 4.0.0
+      '@lifi/compose-spec':
+        specifier: ^0.1.0
+        version: 0.1.0
+      '@lifi/composer-sdk':
+        specifier: ^0.1.0
+        version: 0.1.0(@lifi/compose-spec@0.1.0)(typescript@6.0.3)(zod@4.4.3)
       viem:
         specifier: ^2.52.2
         version: 2.52.2(typescript@6.0.3)(zod@3.25.76)
@@ -89,11 +92,11 @@ importers:
 packages:
 
   '@1inch/aqua@https://codeload.github.com/1inch/aqua/tar.gz/81c26e4619ce21556ab02b3284ee2685de21fb18':
-    resolution: {tarball: https://codeload.github.com/1inch/aqua/tar.gz/81c26e4619ce21556ab02b3284ee2685de21fb18}
+    resolution: {gitHosted: true, tarball: https://codeload.github.com/1inch/aqua/tar.gz/81c26e4619ce21556ab02b3284ee2685de21fb18}
     version: 0.1.0
 
   '@1inch/aqua@https://codeload.github.com/1inch/aqua/tar.gz/ec7e8cf8cb2ba1131b670848d4757cd528014e80':
-    resolution: {tarball: https://codeload.github.com/1inch/aqua/tar.gz/ec7e8cf8cb2ba1131b670848d4757cd528014e80}
+    resolution: {gitHosted: true, tarball: https://codeload.github.com/1inch/aqua/tar.gz/ec7e8cf8cb2ba1131b670848d4757cd528014e80}
     version: 0.0.6
 
   '@1inch/solidity-utils@6.8.0':
@@ -106,7 +109,7 @@ packages:
     resolution: {integrity: sha512-2vKx7+EGw+IS/UoyHW3+9d0TPb+F+018KEJ9sQVqMy9Xd3Q3VxypdSYklUgYF9YmrjNxRtCPTRll28sFEeqNiQ==}
 
   '@1inch/swap-vm@https://codeload.github.com/1inch/swap-vm/tar.gz/1d82046cc309cf66ba688aee9e600a6b293ce6cf':
-    resolution: {tarball: https://codeload.github.com/1inch/swap-vm/tar.gz/1d82046cc309cf66ba688aee9e600a6b293ce6cf}
+    resolution: {gitHosted: true, tarball: https://codeload.github.com/1inch/swap-vm/tar.gz/1d82046cc309cf66ba688aee9e600a6b293ce6cf}
     version: 0.0.2
 
   '@adraffy/ens-normalize@1.10.1':
@@ -631,11 +634,15 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
-  '@lifi/sdk@4.0.0':
-    resolution: {integrity: sha512-4xhwdc1cDgNv99slKG31dKzCPmZmJJFaxO4nayxIsaggeBZnG2VIie2x+cMS882fslKXGKMaoXGkP76/havwEA==}
+  '@lifi/compose-spec@0.1.0':
+    resolution: {integrity: sha512-kmGPuPLxJrAldEeCAjvp4TRBvvMr96ZpH6NYEuqIxCQApmGSmh7leSFz2Mp6tSXc0UZuHIIwsqeGQvE6c0O/Zg==}
+    engines: {node: '>=18'}
 
-  '@lifi/types@17.82.1':
-    resolution: {integrity: sha512-n1FDyQtREj8RO/6XTeC1B2fq39t3CUlm7b+TeiMKQ6pLRpovwAZFhhv7dZIuAqr9FJvXc3cKVciyrR3L5IthmQ==}
+  '@lifi/composer-sdk@0.1.0':
+    resolution: {integrity: sha512-JY2rZdqo1k2QQSWPHaqV+81dXeRoV463hLNcyr3chBhIpPWj2jez7EWai95WI4qTez7oSvsNXi8luW5o2FnLcQ==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      '@lifi/compose-spec': 0.1.0
 
   '@metamask/abi-utils@2.0.4':
     resolution: {integrity: sha512-StnIgUB75x7a7AgUhiaUZDpCsqGp7VkNnZh2XivXkJ6mPkE83U8ARGQj5MbRis7VJY8BC5V1AbB1fjdh0hupPQ==}
@@ -1250,6 +1257,9 @@ packages:
     resolution: {integrity: sha512-KIN/nDJBQRcXw0MLVhZE9iQHmG68qAVIBg9CqmUYjmQIhgij9U5MFvrqkUL5FbtyyzZuOeOt0zdeRe4UY7ct+A==}
     engines: {node: '>= 0.4'}
 
+  effect@3.21.3:
+    resolution: {integrity: sha512-RqwU7WnJ6CqYhyjpOVJA5vh1Sgkn6eVECO6mnD0EjlbWcC2M3LJaPglXXr13Rdo/Y+B+wTEPzGRYFNL2xKxNeQ==}
+
   electron-to-chromium@1.5.372:
     resolution: {integrity: sha512-M3yhbAlilnwqC8D21t28UCDGHyitShTmmLRU/H+b74P6Ski16Nb9HONYEaVpMj/pwC7BEo5B95FpjODLCWbtfA==}
 
@@ -1338,6 +1348,10 @@ packages:
     resolution: {integrity: sha512-2Zks0hf1VLFYI1kbh0I5jP3KHHyCHpkfyHBzsSXRFgl/Bg9mWYfMW8oD+PdMPlEwy5HNsR9JutYy6pMeOh61nw==}
     engines: {node: ^14.15.0 || ^16.10.0 || >=18.0.0}
 
+  fast-check@3.23.2:
+    resolution: {integrity: sha512-h5+1OzzfCC3Ef7VbtKdcv7zsstUQwUDlYpUTvjeUsJAssPgLn7QzbboPtL5ro04Mq0rPOsMzl7q5hIbRs2wD1A==}
+    engines: {node: '>=8.0.0'}
+
   fast-deep-equal@3.1.3:
     resolution: {integrity: sha512-f3qQ9oQy9j2AhBe/H9VC91wLmKBCCU/gDOnKNAYG5hswO7BLKj09Hc5HYNz9cGI++xlpDCIgDaitVs03ATR84Q==}
 
@@ -1395,7 +1409,7 @@ packages:
     engines: {node: '>= 0.4'}
 
   forge-std@https://codeload.github.com/foundry-rs/forge-std/tar.gz/8e40513d678f392f398620b3ef2b418648b33e89:
-    resolution: {tarball: https://codeload.github.com/foundry-rs/forge-std/tar.gz/8e40513d678f392f398620b3ef2b418648b33e89}
+    resolution: {gitHosted: true, tarball: https://codeload.github.com/foundry-rs/forge-std/tar.gz/8e40513d678f392f398620b3ef2b418648b33e89}
     version: 1.11.0
 
   form-data@4.0.6:
@@ -1928,6 +1942,9 @@ packages:
   process-nextick-args@2.0.1:
     resolution: {integrity: sha512-3ouUOpQhtgrbOa17J7+uxOTpITYWaGP7/AhoR3+A+/1e9skrzelGi/dXzEYyvbxubEF6Wn2ypscTKiKJFFn1ag==}
 
+  pure-rand@6.1.0:
+    resolution: {integrity: sha512-bVWawvoZoBYpp6yIoQtQXHZjmz35RSVHnUOTefl8Vcjr8snTPY1wnpSPMWekcFwbxI6gtmT7rSYPFvz71ldiOA==}
+
   qs@6.15.2:
     resolution: {integrity: sha512-Rzq0KEyX/w/tEybncDgdkZrJgVUsUMk3xjh3t5bv3S1HTAtg+uOYt72+ZfwiQwKdysThkTBdL/rTi6HDmX9Ddw==}
     engines: {node: '>=0.6'}
@@ -2391,6 +2408,9 @@ packages:
 
   zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
+
+  zod@4.4.3:
+    resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
 
 snapshots:
 
@@ -3191,11 +3211,19 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@lifi/sdk@4.0.0':
+  '@lifi/compose-spec@0.1.0':
     dependencies:
-      '@lifi/types': 17.82.1
+      effect: 3.21.3
+      zod: 4.4.3
 
-  '@lifi/types@17.82.1': {}
+  '@lifi/composer-sdk@0.1.0(@lifi/compose-spec@0.1.0)(typescript@6.0.3)(zod@4.4.3)':
+    dependencies:
+      '@lifi/compose-spec': 0.1.0
+      abitype: 1.2.3(typescript@6.0.3)(zod@4.4.3)
+      effect: 3.21.3
+    transitivePeerDependencies:
+      - typescript
+      - zod
 
   '@metamask/abi-utils@2.0.4':
     dependencies:
@@ -3538,6 +3566,11 @@ snapshots:
     optionalDependencies:
       typescript: 6.0.3
       zod: 3.25.76
+
+  abitype@1.2.3(typescript@6.0.3)(zod@4.4.3):
+    optionalDependencies:
+      typescript: 6.0.3
+      zod: 4.4.3
 
   adm-zip@0.4.16: {}
 
@@ -3885,6 +3918,11 @@ snapshots:
       es-errors: 1.3.0
       gopd: 1.2.0
 
+  effect@3.21.3:
+    dependencies:
+      '@standard-schema/spec': 1.0.0
+      fast-check: 3.23.2
+
   electron-to-chromium@1.5.372: {}
 
   elliptic@6.6.1:
@@ -4063,6 +4101,10 @@ snapshots:
       jest-matcher-utils: 29.7.0
       jest-message-util: 29.7.0
       jest-util: 29.7.0
+
+  fast-check@3.23.2:
+    dependencies:
+      pure-rand: 6.1.0
 
   fast-deep-equal@3.1.3: {}
 
@@ -4693,6 +4735,21 @@ snapshots:
     transitivePeerDependencies:
       - zod
 
+  ox@0.14.29(typescript@6.0.3)(zod@4.4.3):
+    dependencies:
+      '@adraffy/ens-normalize': 1.11.1
+      '@noble/ciphers': 1.3.0
+      '@noble/curves': 1.9.1
+      '@noble/hashes': 1.8.0
+      '@scure/bip32': 1.7.0
+      '@scure/bip39': 1.6.0
+      abitype: 1.2.3(typescript@6.0.3)(zod@4.4.3)
+      eventemitter3: 5.0.1
+    optionalDependencies:
+      typescript: 6.0.3
+    transitivePeerDependencies:
+      - zod
+
   ox@0.8.7(typescript@5.4.5)(zod@3.25.76):
     dependencies:
       '@adraffy/ens-normalize': 1.11.1
@@ -4781,6 +4838,8 @@ snapshots:
       react-is: 18.3.1
 
   process-nextick-args@2.0.1: {}
+
+  pure-rand@6.1.0: {}
 
   qs@6.15.2:
     dependencies:
@@ -5136,6 +5195,23 @@ snapshots:
       - utf-8-validate
       - zod
 
+  viem@2.52.2(typescript@6.0.3)(zod@4.4.3):
+    dependencies:
+      '@noble/curves': 1.9.1
+      '@noble/hashes': 1.8.0
+      '@scure/bip32': 1.7.0
+      '@scure/bip39': 1.6.0
+      abitype: 1.2.3(typescript@6.0.3)(zod@4.4.3)
+      isows: 1.0.7(ws@8.20.1)
+      ox: 0.14.29(typescript@6.0.3)(zod@4.4.3)
+      ws: 8.20.1
+    optionalDependencies:
+      typescript: 6.0.3
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+      - zod
+
   walker@1.0.8:
     dependencies:
       makeerror: 1.0.12
@@ -5228,3 +5304,5 @@ snapshots:
       ethers: 5.8.0
 
   zod@3.25.76: {}
+
+  zod@4.4.3: {}

@@ -19,10 +19,10 @@ export default function Header() {
         style={{ display: "inline-flex", alignItems: "center", gap: 10 }}
       >
         <Image
-          src="/tenorfi_logo.png"
+          src="/tenorfi-logo.png"
           alt="TenorFi"
-          width={132}
-          height={261}
+          width={500}
+          height={500}
           priority
           className="brand-logo"
           style={{ height: 30, width: "auto", flex: "none" }}
@@ -39,6 +39,9 @@ export default function Header() {
         </Link>
         <a href="/#how" className="hide-sm">
           How it works
+        </a>
+        <a href="/#pricing" className="hide-sm">
+          Pricing
         </a>
         <a href="/#faq" className="hide-sm">
           FAQ

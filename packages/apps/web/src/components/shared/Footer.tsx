@@ -11,10 +11,10 @@ export default function Footer() {
             style={{ fontSize: 20, display: "inline-flex", alignItems: "center", gap: 10 }}
           >
             <Image
-              src="/tenorfi_logo.png"
+              src="/tenorfi-logo.png"
               alt="TenorFi"
-              width={132}
-              height={261}
+              width={500}
+              height={500}
               className="brand-logo"
               style={{ height: 28, width: "auto", flex: "none" }}
             />

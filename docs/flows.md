@@ -98,7 +98,7 @@ The intersection between the CRE write path and the Aqua read path is a **single
 | `PERIOD_SECONDS` | **3600** (must match in the order) |
 | Settlement token (`tokenOut`) | canonical Base USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` |
 | Aqua (canonical, reused) | `0x499943E74FB0cE105688beeE8Ef2ABec5D936d31` |
-| Aqua settlement layer (router + program + position token) | **not deployed yet** → `script/DeployAqua.s.sol` (points orders at the live `FundingIndex`; does **not** redeploy it) |
+| Aqua settlement layer (router + program + position token) | deploys with the rest of the stack in one shot via `script/Deploy.s.sol` |
 
 The CRE write path is **live and verified on-chain** (real Hyperliquid funding written into `FundingIndex`).
 What remains is deploying the Aqua settlement layer and wiring open/ship + a keeper (see §D).

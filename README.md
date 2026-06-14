@@ -93,7 +93,7 @@ The Chainlink CRE funding stack is deployed and the end-to-end write is verified
 | Settlement token | **canonical Base USDC** [`0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`](https://basescan.org/address/0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913) — real USDC *(an early `MockUSDC 0x3A51…c6e8` is superseded/unused; CRE never used a token)* |
 | Base `MockKeystoneForwarder` (rotatable; sim `--broadcast`) | `0x5e342a8438b4f5d39e72875fcee6f76b39cce548` |
 
-Verified CRE write — tx [`0xd1b1e41b545a273e29f36a5f40f1238b0f32a3464bf7bc0698dcba78ff7e87f2`](https://basescan.org/tx/0xd1b1e41b545a273e29f36a5f40f1238b0f32a3464bf7bc0698dcba78ff7e87f2): `FundingIndex.getFundingIndex(494834)` returns `(12500000000000, true)` — Hyperliquid BTC funding `0.0000125` scaled to 1e18. Deployed via `script/DeployFunding.s.sol` (the CRE write path only; the full Aqua/SwapVM stack uses `script/Deploy.s.sol`).
+Verified CRE write — tx [`0xd1b1e41b545a273e29f36a5f40f1238b0f32a3464bf7bc0698dcba78ff7e87f2`](https://basescan.org/tx/0xd1b1e41b545a273e29f36a5f40f1238b0f32a3464bf7bc0698dcba78ff7e87f2): `FundingIndex.getFundingIndex(494834)` returns `(12500000000000, true)` — Hyperliquid BTC funding `0.0000125` scaled to 1e18. The full stack (funding latch + CRE receiver + SwapVM router + program + position token) deploys in one shot via `script/Deploy.s.sol`. *(A fresh deploy yields a new `KeelFundingReceiver` — repoint the CRE workflow's `receiverAddress` and re-deploy it.)*
 
 ## Repository layout
 

@@ -19,7 +19,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --import tsx --test \"src/**/*.test.ts\""
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
+    "validate:deposit": "node --import tsx scripts/validate-deposit.ts"
   },
   "dependencies": {
     "@lifi/sdk": "^4.0.0",

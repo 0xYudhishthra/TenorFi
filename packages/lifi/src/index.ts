@@ -8,9 +8,10 @@
 //   2.1 client       — @lifi/sdk config + chain constants          [done]
 //   2.2 deposit      — buildHyperCoreDeposit(amount, fromChain)      [done]
 //   2.3 open call    — buildOpenCall({ chain, target, calldata, ... })  [done]
-//   2.4 orchestrator — buildOpenHedge(...) builds both legs  [done]
+//   2.4 orchestrator — buildOpenHedge(...) builds both legs + executeHedge(...)  [done]
 
 export * from "./client.js";
 export * from "./deposit.js";
 export * from "./open.js";
 export * from "./hedge.js";
+export * from "./execute.js";

@@ -408,11 +408,35 @@ table[data-tabular="true"] { font-variant-numeric: tabular-nums; }
 .mcp-asks { display:grid; gap:10px; margin-top:16px; }
 .ask { display:flex; gap:12px; align-items:flex-start; padding:14px 16px; border:1px solid var(--line); border-radius:var(--r-md); background:var(--bg-raised); font-size:14px; color:var(--fg-secondary); transition:border-color var(--t-base) var(--ease), box-shadow var(--t-base) var(--ease); }
 .ask:hover { border-color:var(--navy-tint); box-shadow:var(--sh-sm); }
-.ask svg { flex:none; color:var(--navy); margin-top:2px; }
-.ask .q { color:var(--fg-primary); }
+.ask > svg { flex:none; color:var(--navy); margin-top:2px; }
+.ask .q { color:var(--fg-primary); flex:1; min-width:0; }
+.ask-copy { flex:none; display:inline-flex; align-items:center; gap:5px; border:0; background:none; cursor:pointer; color:var(--fg-tertiary); font-family:var(--f-sans); font-size:12px; font-weight:600; padding:4px 7px; margin:-2px -3px -2px 0; border-radius:var(--r-sm); transition:color var(--t-fast) var(--ease), background var(--t-fast) var(--ease); }
+.ask-copy:hover { color:var(--navy); background:var(--navy-tint-2); }
+.ask-copy.done { color:var(--up); }
+.ask-copy svg { display:block; flex:none; }
 
 .mcp-tie { margin-top:24px; padding:20px 22px; border-radius:var(--r-lg); background:var(--navy-tint-2); border:1px solid var(--navy-tint); font-size:14.5px; line-height:1.55; color:var(--fg-secondary); max-width:78ch; }
 .mcp-tie b { color:var(--navy); font-weight:600; }
+
+/* connect-client tabbed selector — TenorFi light (paper surface, navy accent) */
+.connect { background:var(--bg-raised); border:1px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--sh-md); overflow:hidden; }
+.connect-tabhead { position:relative; border-bottom:1px solid var(--line); background:var(--bg-surface); }
+.connect-tabs { display:flex; overflow-x:auto; scrollbar-width:none; -ms-overflow-style:none; }
+.connect-tabs::-webkit-scrollbar { display:none; }
+.connect-tab { white-space:nowrap; padding:14px 18px; font-family:var(--f-sans); font-size:14px; font-weight:600; color:var(--fg-tertiary); background:none; border:0; border-bottom:2px solid transparent; margin-bottom:-1px; cursor:pointer; transition:color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease); }
+.connect-tab:hover { color:var(--fg-primary); }
+.connect-tab.on { color:var(--navy); border-bottom-color:var(--navy); }
+.connect-arrow { position:absolute; top:0; bottom:0; z-index:2; display:flex; align-items:center; border:0; background:transparent; color:var(--fg-tertiary); cursor:pointer; }
+.connect-arrow:hover { color:var(--navy); }
+.connect-arrow.l { left:0; padding:0 20px 0 10px; background:linear-gradient(to right, var(--bg-surface) 60%, transparent); }
+.connect-arrow.r { right:0; padding:0 10px 0 20px; background:linear-gradient(to left, var(--bg-surface) 60%, transparent); }
+.connect-body { padding:24px; }
+.connect-steps { list-style:none; margin:0; padding:0; display:grid; gap:20px; }
+.connect-step { display:flex; gap:14px; align-items:flex-start; }
+.connect-step .txt { flex:1; min-width:0; padding-top:2px; }
+.connect-step p { font-size:14.5px; line-height:1.55; color:var(--fg-secondary); }
+.connect-file { font-family:var(--f-mono); font-size:0.86em; background:var(--navy-tint-2); color:var(--navy); padding:2px 6px; border-radius:var(--r-xs); }
+.connect-accent { color:var(--navy); font-weight:600; }
 
 /* ============================ Explorer styles ============================ */
 .exp { padding: 28px 0 96px; }

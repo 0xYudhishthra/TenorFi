@@ -164,4 +164,51 @@ contract FundingSettleE2ETest is Test {
         vm.expectRevert();
         router.swap(order, address(pos), address(usdc), 0, _takerData(hedger));
     }
+
+    // Two shipped orders per position: a Keel position is the LP-pays-above leg AND the hedger-pays-below
+    // mirror leg. Here we ship BOTH and settle the R < F window through real Aqua — the mirror leg moves
+    // (F - R) * N from the hedger (maker) to the LP (bound taker). Proves the full two-order model
+    // end-to-end, not just the harness unit (`test_makerPaysBelow_RBelowF_pays`).
+    function test_twoLegs_RBelowF_mirrorLegPaysLP() public {
+        uint256 floor = (CAP * N) / ONE; // 2,000 USDC per leg
+
+        // Leg 1 — LP ships the pays-above order (bound taker = hedger).
+        ISwapVM.Order memory lpLeg =
+            program.buildProgram(lp, address(idx), F, CAP, N, PERIOD_SECONDS, hedger, true);
+        address[] memory tokens = new address[](2);
+        tokens[0] = address(pos);
+        tokens[1] = address(usdc);
+        uint256[] memory amounts = new uint256[](2);
+        amounts[0] = ONE;
+        amounts[1] = floor;
+        vm.startPrank(lp);
+        usdc.approve(address(aqua), type(uint256).max);
+        pos.approve(address(aqua), type(uint256).max);
+        aqua.ship(address(router), abi.encode(lpLeg), tokens, amounts);
+        vm.stopPrank();
+
+        // Leg 2 — the hedger ships the mirror pays-below order (bound taker = LP).
+        usdc.mint(hedger, floor);
+        pos.mint(hedger, ONE);
+        ISwapVM.Order memory hedgerLeg =
+            program.buildProgram(hedger, address(idx), F, CAP, N, PERIOD_SECONDS, lp, false);
+        vm.startPrank(hedger);
+        usdc.approve(address(aqua), type(uint256).max);
+        pos.approve(address(aqua), type(uint256).max);
+        aqua.ship(address(router), abi.encode(hedgerLeg), tokens, amounts);
+        vm.stopPrank();
+
+        // R < F window: the mirror leg pays (F - R) * N from hedger → LP through real Aqua.
+        vm.warp(block.timestamp + PERIOD_SECONDS);
+        idx.setFundingIndex(block.timestamp / PERIOD_SECONDS, 0); // R = 0 < F
+        uint256 expected = uint256(F) * N / ONE; // (F - 0) * N = 500 USDC
+        uint256 lpBefore = usdc.balanceOf(lp);
+        uint256 hedgerBefore = usdc.balanceOf(hedger);
+
+        vm.prank(lp);
+        router.swap(hedgerLeg, address(pos), address(usdc), 0, _takerData(lp));
+
+        assertEq(usdc.balanceOf(lp), lpBefore + expected, "LP receives (F-R)*N on the mirror leg");
+        assertEq(usdc.balanceOf(hedger), hedgerBefore - expected, "hedger pays the mirror leg");
+    }
 }

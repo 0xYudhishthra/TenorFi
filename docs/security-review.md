@@ -10,7 +10,7 @@ Chain: **Base mainnet** (chain id 8453).
 > never custodied). Findings that were specific to `KeelSwap` are marked **Resolved by removal** below.
 
 ## Test posture
-- **34 tests** (32 local + 2 Base-mainnet-fork) — `forge test` (fork tests skip without `BASE_RPC_URL`).
+- **35 tests** (33 local + 2 Base-mainnet-fork) — `forge test` (fork tests skip without `BASE_RPC_URL`).
 - **Base mainnet fork integration** (`test/swapvm/BaseMainnetFork.t.sol`): deploys our router + program
   against the **real deployed Aqua** and settles with **real USDC** — proving the opcode works against
   production Aqua/USDC, plus the double-settle guard holds there.
@@ -62,7 +62,7 @@ happy-path fork test missed. All actionable findings are now fixed; tests added 
 | 7 | Low | **`setForwarder(0)` bricks funding writes** | **Fixed** — zero-address check added in `FundingIndex.setForwarder` (still in scope). |
 | 8 | Low | **Bare `require` on transfer (non-standard ERC20)** | **Resolved by removal** — the bare transfers were in `KeelSwap` (deleted). The Aqua path uses Aqua's own token movement; Base USDC returns `bool` and behaves standardly. |
 
-**Test count after fixes + KeelSwap removal: 34** (32 offline + 2 Base-mainnet fork). Covers: directional settlement, taker-bind, stranger-cannot-take, clamp-to-cap, double-settle, and no-default on the Aqua path (ship-floor covers the worst case; underfunded period reverts).
+**Test count after fixes + KeelSwap removal: 35** (33 offline + 2 Base-mainnet fork). Covers: directional settlement, taker-bind, stranger-cannot-take, clamp-to-cap, double-settle, no-default on the Aqua path (ship-floor covers the worst case; underfunded period reverts), and the two-leg mirror settlement (R<F hedger-pays-LP) end-to-end on real Aqua.
 
 ## Known limitations / out of scope
 - **Oracle staleness / liveness** — if CRE/relayer stops writing, settlement halts for that period (funds safe; not lost). The receiver's relayer fallback mitigates liveness.

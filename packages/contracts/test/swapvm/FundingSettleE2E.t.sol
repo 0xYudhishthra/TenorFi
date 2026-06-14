@@ -96,7 +96,7 @@ contract FundingSettleE2ETest is Test {
     // R > F: the reserve covers (R−F)·N → subscriber receives it, posts NOTHING.
     function test_coverage_RAboveF_subscriberPostsNothing() public {
         int256 r = int256((ONE * 3) / 100); // 3% > F
-        uint256 net = uint256(r - F) * N / ONE; // 2% * 50k = 1,000 USDC
+        uint256 net = uint256(r - F) * N * PERIOD_SECONDS / (ONE * 3600); // 2% * 50k = 1,000 USDC
         ISwapVM.Order memory order = _order();
         _shipReserve(order, 5_000 * 1e6);
         idx.setFundingIndex(block.timestamp / PERIOD_SECONDS, r);
@@ -111,7 +111,7 @@ contract FundingSettleE2ETest is Test {
     // R < F: the premium (F−R)·N is pulled from the subscriber's WALLET — nothing pre-locked.
     function test_premium_RBelowF_pulledFromWallet() public {
         int256 r = 0; // below F
-        uint256 premium = uint256(F - r) * N / ONE; // 1% * 50k = 500 USDC
+        uint256 premium = uint256(F - r) * N * PERIOD_SECONDS / (ONE * 3600); // 1% * 50k = 500 USDC
         ISwapVM.Order memory order = _order();
         _shipReserve(order, 5_000 * 1e6);
         idx.setFundingIndex(block.timestamp / PERIOD_SECONDS, r);

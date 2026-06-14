@@ -45,7 +45,7 @@ contract FundingSettleTest is Test {
         idx.setFundingIndex(_period(), r);
         (uint256 amtIn, uint256 amtOut) = harness.settle(_args(), subscriber, MARKER, USDC);
         assertEq(amtIn, 0, "no premium pulled");
-        assertEq(amtOut, uint256(r - F) * N / ONE, "reserve covers (R-F)*N");
+        assertEq(amtOut, uint256(r - F) * N * PERIOD_SECONDS / (ONE * 3600), "reserve covers (R-F)*N");
     }
 
     // R < F: the subscriber pays the premium → opcode sets amountIn (pulled from their wallet).
@@ -54,7 +54,7 @@ contract FundingSettleTest is Test {
         idx.setFundingIndex(_period(), r);
         (uint256 amtIn, uint256 amtOut) = harness.settle(_args(), subscriber, USDC, MARKER);
         assertEq(amtOut, 1, "1-wei marker receipt (SwapVM requires amountOut > 0)");
-        assertEq(amtIn, uint256(F - r) * N / ONE, "premium (F-R)*N pulled from wallet");
+        assertEq(amtIn, uint256(F - r) * N * PERIOD_SECONDS / (ONE * 3600), "premium (F-R)*N pulled from wallet");
     }
 
     // Funding can go negative; for the subscriber that is still the premium direction (R < F).
@@ -62,14 +62,14 @@ contract FundingSettleTest is Test {
         int256 r = -int256((ONE * 2) / 100); // -2%
         idx.setFundingIndex(_period(), r);
         (uint256 amtIn,) = harness.settle(_args(), subscriber, USDC, MARKER);
-        assertEq(amtIn, uint256(F - r) * N / ONE); // (1% + 2%) * N, |diff| < cap
+        assertEq(amtIn, uint256(F - r) * N * PERIOD_SECONDS / (ONE * 3600)); // (1% + 2%) * N, |diff| < cap
     }
 
     function test_coverage_clampsToCap() public {
         int256 r = int256((ONE * 50) / 100); // 50% spike
         idx.setFundingIndex(_period(), r);
         (, uint256 amtOut) = harness.settle(_args(), subscriber, MARKER, USDC);
-        assertEq(amtOut, CAP * N / ONE); // clamped to cap
+        assertEq(amtOut, CAP * N * PERIOD_SECONDS / (ONE * 3600)); // clamped to cap
     }
 
     function test_zeroDiff_movesNothing() public {

@@ -35,7 +35,7 @@ contract Settle is Script {
     address internal constant FUNDING_INDEX = 0x545f162204A92CEbeb12AA0A4AaDF777d6905005;
     address internal constant USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
 
-    uint256 internal constant PERIOD_SECONDS = 3600;
+    uint256 internal constant PERIOD_SECONDS = 60; // per-minute demo; must match the shipped order
     uint256 internal constant RATE_ONE = 1e18;
 
     function run() external {
@@ -70,13 +70,13 @@ contract Settle is Script {
         vm.startBroadcast(pk);
         if (diff > 0) {
             // Coverage (R > F): the reserve pays the subscriber. tokenIn = marker (0), tokenOut = USDC.
-            uint256 coverage = (uint256(diff) * notional) / RATE_ONE;
+            uint256 coverage = (uint256(diff) * notional * PERIOD_SECONDS) / (RATE_ONE * 3600);
             console2.log("coverage paid to subscriber (USDC 1e6):", coverage);
             KeelSwapVMRouter(ROUTER).swap(order, POS, USDC, 0, _takerData(subscriber));
         } else {
             // Premium (R < F): pulled from the subscriber's wallet. tokenIn = USDC, amount = premium.
             // (The subscriber must have approved USDC to Aqua once at subscribe time.)
-            uint256 premium = (uint256(-diff) * notional) / RATE_ONE;
+            uint256 premium = (uint256(-diff) * notional * PERIOD_SECONDS) / (RATE_ONE * 3600);
             console2.log("premium pulled from subscriber wallet (USDC 1e6):", premium);
             KeelSwapVMRouter(ROUTER).swap(order, USDC, POS, premium, _takerData(subscriber));
         }

@@ -46,6 +46,13 @@ abstract contract FundingSettle {
 
     uint256 internal constant RATE_ONE = 1e18;
 
+    /// @dev The funding rate `R` and fixed rate `F` are quoted PER HOUR (Hyperliquid's funding
+    ///      interval). Each settlement charges only the slice proportional to its own window:
+    ///      `× periodSeconds / 3600`. So a per-minute window (`periodSeconds = 60`) collects 1/60th
+    ///      of the hourly amount, and 60 minutes sum to one hour — while the index still records the
+    ///      real hourly rate. Hourly settlement (`periodSeconds = 3600`) is a no-op scale (×1).
+    uint256 internal constant FUNDING_PERIOD_SECONDS = 3600;
+
     /// @notice orderHash => period => settled. Prevents settling the same period twice.
     mapping(bytes32 => mapping(uint256 => bool)) public settled;
 
@@ -78,8 +85,10 @@ abstract contract FundingSettle {
             settled[ctx.query.orderHash][period] = true;
         }
 
-        int256 diff = _clamp(realized - fixedRate, cap); // clamp(R - F, ±cap)
-        int256 amt = (diff * int256(notional)) / int256(RATE_ONE); // signed net, USDC 1e6
+        int256 diff = _clamp(realized - fixedRate, cap); // clamp(R - F, ±cap), per-hour
+        // Scale the hourly net to this settlement window (× periodSeconds / 3600).
+        int256 amt = (diff * int256(notional) * int256(periodSeconds))
+            / (int256(RATE_ONE) * int256(FUNDING_PERIOD_SECONDS)); // signed net for this window, USDC 1e6
 
         if (amt > 0) {
             // R > F: reserve covers the funding → pays the subscriber from its shipped balance.

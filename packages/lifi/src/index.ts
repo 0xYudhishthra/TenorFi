@@ -1,17 +1,18 @@
 // @keel/lifi — LI.FI Composer orchestrator for Keel.
 //
-// Cross-chain onboarding for the hedge: bring USDC from any chain and (a) deposit
-// collateral into Hyperliquid (HyperCore) and (b) call KeelSwap.open on the
-// destination chain. Standalone library consumed later by the MCP layer.
+// Onboarding for the hedge, built entirely on LI.FI Composer (@lifi/composer-sdk):
+//   - Keel leg:  a Composer flow on Base ships the funding-settlement order into
+//                Aqua via the user's execution proxy (core.rawCall), collateral
+//                stays live on the proxy as the Aqua virtual balance.
+//   - Perp leg:  a Composer flow bridges USDC toward Hyperliquid (lifi.swap),
+//                swept to the user; the perp order is placed via the HL API.
 //
-// Phase 2:
-//   2.1 client       — @lifi/sdk config + chain constants          [done]
-//   2.2 deposit      — buildHyperCoreDeposit(amount, fromChain)      [done]
-//   2.3 open call    — buildOpenCall({ chain, target, calldata, ... })  [done]
-//   2.4 orchestrator — buildOpenHedge(...) builds both legs + executeHedge(...)  [done]
+// Two compiled flows = two signed transactions submitted together (they have
+// conflicting sweep semantics). Composer never touches the non-EVM perp order.
 
 export * from "./client.js";
-export * from "./deposit.js";
+export * from "./keel.js";
 export * from "./open.js";
+export * from "./deposit.js";
 export * from "./hedge.js";
 export * from "./execute.js";

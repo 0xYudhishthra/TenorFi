@@ -8,9 +8,9 @@ import { createPublicClient, encodeFunctionData, http, type PublicClient } from 
 export const KEEL_BASE = {
   chainId: 8453,
   aqua: "0x499943E74FB0cE105688beeE8Ef2ABec5D936d31",
-  router: "0x3a526bdb3249512580760A703248c3E0700766E9",
-  program: "0x5A6f0876EDe0797ee126a32a616875862BfcF6EB",
-  positionToken: "0x6514B382a2a5BaeAF5c17ab6A02c5A1fB511FfB9",
+  router: "0xba93ebc0A6a24980703423C3CE729F15eEDA099B",
+  program: "0xd04Aa86aB1bd11834931b667f918B945f6556174",
+  positionToken: "0x7c055823cfe08841a1b3F73e56C86183bc859132",
   fundingIndex: "0x545f162204A92CEbeb12AA0A4AaDF777d6905005",
   usdc: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
   periodSeconds: 3600,

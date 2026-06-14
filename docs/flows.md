@@ -40,7 +40,7 @@ speculators provide it.)*
 | **TenorFi MCP** | The front door. Reads funding, lists offers, builds the transactions, routes the funding coverage to the user's HL margin. *Proposes; the human confirms.* |
 | **LI.FI Composer** | The on-ramp. Brings the user's USDC cross-chain to fund the **Hyperliquid perp** and authorize the **TenorFi subscription** in one Flow. |
 | **Hyperliquid** | Where the real perp lives (leg 1). Also the **funding-rate data source** (read by Chainlink). |
-| **TenorFi contracts** (Base mainnet) | The subscription engine (leg 2): the `_fundingSettle` Aqua opcode (`KeelSwapVMRouter` + `KeelFundingProgram`). Pulls the fixed premium from the user's wallet via Aqua each period — **no custody, no user-posted collateral**. |
+| **TenorFi contracts** (Base mainnet) | The subscription engine (leg 2): the `_fundingSettle` Aqua opcode (`TenorSwapVMRouter` + `TenorFundingProgram`). Pulls the fixed premium from the user's wallet via Aqua each period — **no custody, no user-posted collateral**. |
 | **1inch Aqua / SwapVM** | The settlement engine. **Pulls the fixed premium directly from the user's wallet, just-in-time each period — the user locks up nothing.** |
 | **Chainlink CRE** | The thermometer. Reads Hyperliquid funding → DON consensus → writes it on-chain — the **actual funding TenorFi must cover**. |
 | **Insurance reserve** | The protocol's pre-funded counterparty that **covers the user's funding** and collects the premium. In the MVP, a **pre-funded team wallet**. |
@@ -194,9 +194,9 @@ So default risk lives only on the insurer's side, and it's bounded + pre-funded.
 - **Read:** `get_funding(market)` (AFR via Chainlink), `list_offers()` (the insurer's fixed-rate offers),
   `get_position(addr)`, `preview_settle(swapId, realized)`.
 - **Open (user-signed):** `open_hyperliquid_position(market, side, size)` (HL API) +
-  `open_keel_position(offerId)` (authorize Aqua to pull the premium via `KeelFundingProgram`/`KeelSwapVMRouter`
+  `open_keel_position(offerId)` (authorize Aqua to pull the premium via `TenorFundingProgram`/`TenorSwapVMRouter`
   — no collateral deposit).
-- **Settle (routine, keeper/agent):** the bound taker calls `KeelSwapVMRouter.swap` over the order for the
+- **Settle (routine, keeper/agent):** the bound taker calls `TenorSwapVMRouter.swap` over the order for the
   period (Aqua pulls the premium); the reserve covers the funding → `topup_hyperliquid_margin(...)`.
 - **Gated (brink, user-confirmed):** `propose_decision(swapId)` → returns the *unsigned* close / top-up /
   re-match tx for the user to confirm.

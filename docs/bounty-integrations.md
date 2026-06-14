@@ -47,9 +47,9 @@ both a Base-mainnet fork and the live deployment.
 
 **Link to the line of code:**
 - Custom opcode: `https://github.com/0xYudhishthra/TenorFi/blob/main/packages/contracts/src/swapvm/FundingSettle.sol#L53`
-- Opcode registration into Aqua's set: `https://github.com/0xYudhishthra/TenorFi/blob/main/packages/contracts/src/swapvm/KeelOpcodes.sol#L29`
-- Our SwapVM router (`Simulator, SwapVM, KeelOpcodes`): `https://github.com/0xYudhishthra/TenorFi/blob/main/packages/contracts/src/swapvm/KeelSwapVMRouter.sol#L15`
-- Live on Base mainnet: router `0x3a526bdb3249512580760A703248c3E0700766E9`, program `0x5A6f0876EDe0797ee126a32a616875862BfcF6EB` (Basescan-verified).
+- Opcode registration into Aqua's set: `https://github.com/0xYudhishthra/TenorFi/blob/main/packages/contracts/src/swapvm/TenorOpcodes.sol#L29`
+- Our SwapVM router (`Simulator, SwapVM, KeelOpcodes`): `https://github.com/0xYudhishthra/TenorFi/blob/main/packages/contracts/src/swapvm/TenorSwapVMRouter.sol#L15`
+- Live on Base mainnet: router `0xba93ebc0A6a24980703423C3CE729F15eEDA099B`, program `0xd04Aa86aB1bd11834931b667f918B945f6556174` (Basescan-verified).
 
 **Ease of use (1–10): 6.** Aqua + SwapVM are powerful but the custom-opcode path is sparsely
 documented — we read the source to find the `SwapVM(aqua, name, version)` constructor (3 args), the
@@ -147,7 +147,7 @@ function _fundingSettle(Context memory ctx, bytes calldata args) internal view {
 }
 ```
 
-**Registering the opcode** (`KeelOpcodes.sol`) — appended at the end of the Aqua set so existing
+**Registering the opcode** (`TenorOpcodes.sol`) — appended at the end of the Aqua set so existing
 indices are preserved; `ProgramBuilder.findOpcode` resolves it by function pointer:
 
 ```solidity

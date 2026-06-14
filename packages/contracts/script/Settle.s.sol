@@ -29,9 +29,9 @@ import {FundingIndex} from "../src/FundingIndex.sol";
 ///   PRIVATE_KEY=0x<taker> MAKER=0x<other party> MAKER_PAYS_ABOVE=true \
 ///     NOTIONAL=100000000 forge script script/Settle.s.sol:Settle --rpc-url $BASE_RPC_URL --broadcast
 contract Settle is Script {
-    address internal constant ROUTER = 0x3a526bdb3249512580760A703248c3E0700766E9;
-    address internal constant PROGRAM = 0x5A6f0876EDe0797ee126a32a616875862BfcF6EB;
-    address internal constant POS = 0x6514B382a2a5BaeAF5c17ab6A02c5A1fB511FfB9;
+    address internal constant ROUTER = 0xba93ebc0A6a24980703423C3CE729F15eEDA099B;
+    address internal constant PROGRAM = 0xd04Aa86aB1bd11834931b667f918B945f6556174;
+    address internal constant POS = 0x7c055823cfe08841a1b3F73e56C86183bc859132;
     address internal constant FUNDING_INDEX = 0x545f162204A92CEbeb12AA0A4AaDF777d6905005;
     address internal constant USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
 

@@ -1,7 +1,7 @@
 # TenorFi — Security Review (internal)
 
 Scope: `FundingIndex`, `KeelFundingReceiver`, and the SwapVM settlement pieces
-(`FundingSettle` opcode, `KeelOpcodes`, `KeelSwapVMRouter`, `KeelFundingProgram`).
+(`FundingSettle` opcode, `TenorOpcodes`, `TenorSwapVMRouter`, `TenorFundingProgram`).
 Chain: **Base mainnet** (chain id 8453).
 
 > **Architecture note (settlement is Aqua-only).** The custodial plain-Solidity settlement core

@@ -22,9 +22,9 @@ import {MockERC20} from "./MockERC20.sol";
 contract LiveDeploymentForkTest is Test {
     // Deployed on Base mainnet (deployments.json).
     address internal constant AQUA = 0x499943E74FB0cE105688beeE8Ef2ABec5D936d31;
-    address internal constant ROUTER = 0x3a526bdb3249512580760A703248c3E0700766E9;
-    address internal constant PROGRAM = 0x5A6f0876EDe0797ee126a32a616875862BfcF6EB;
-    address internal constant POS = 0x6514B382a2a5BaeAF5c17ab6A02c5A1fB511FfB9;
+    address internal constant ROUTER = 0xba93ebc0A6a24980703423C3CE729F15eEDA099B;
+    address internal constant PROGRAM = 0xd04Aa86aB1bd11834931b667f918B945f6556174;
+    address internal constant POS = 0x7c055823cfe08841a1b3F73e56C86183bc859132;
     address internal constant FUNDING_INDEX = 0x545f162204A92CEbeb12AA0A4AaDF777d6905005;
     address internal constant USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
 
@@ -66,20 +66,15 @@ contract LiveDeploymentForkTest is Test {
             return;
         }
 
-        // The deployed router/program at these addresses run the OLD (net) opcode; the source has
-        // migrated to the subscription opcode. Re-point these addresses after the TenorFi redeploy.
-        vm.skip(true);
-        return;
-
-        // solhint-disable-next-line no-unreachable
         TenorSwapVMRouter router = TenorSwapVMRouter(ROUTER);
         TenorFundingProgram program = TenorFundingProgram(PROGRAM);
         assertEq(address(router.AQUA()), AQUA, "deployed router uses canonical Aqua");
 
-        int256 F = 1_000_000_000_000; // 1e12 — fixed below the real R so the reserve pays
+        int256 F = 1_000_000_000_000; // 1e12 — fixed below the real R so the reserve covers
         uint256 CAP = 4e16; // 4%
         uint256 N = 50_000 * 1e6; // 50k notional
-        uint256 net = uint256(LIVE_R - F) * N / 1e18; // clamp not binding (diff < cap)
+        // coverage = (R-F) * N * periodSeconds/3600; with periodSeconds=3600 the scale is 1.
+        uint256 net = uint256(LIVE_R - F) * N * PERIOD_SECONDS / (1e18 * 3600);
 
         ISwapVM.Order memory order =
             program.buildProgram(lp, FUNDING_INDEX, F, CAP, N, PERIOD_SECONDS, hedger, USDC);

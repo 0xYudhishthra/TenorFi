@@ -1,7 +1,7 @@
 {
   "name": "@keel/api",
   "version": "0.0.1",
-  "description": "Keel API — core hedge orchestration with HTTP + MCP skins over @keel/lifi and @keel/hyperliquid.",
+  "description": "Keel API — core hedge orchestration (HTTP + background workers) over @keel/lifi and @keel/hyperliquid.",
   "license": "MIT",
   "type": "module",
   "private": true,
@@ -12,7 +12,9 @@
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "dev": "node --env-file=../../.env --import tsx --watch src/main.ts",
     "start": "node --env-file=../../.env --import tsx src/main.ts",
-    "exec-node": "node --env-file=../../.env --import tsx src/execution-node/main.ts"
+    "exec-node": "node --env-file=../../.env --import tsx src/execution-node/main.ts",
+    "start:prod": "node --import tsx src/main.ts",
+    "exec-node:prod": "node --import tsx src/execution-node/main.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",

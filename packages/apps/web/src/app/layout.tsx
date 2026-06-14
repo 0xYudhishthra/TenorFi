@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
-      { url: "/tenorfi_logo.png", type: "image/png" },
+      { url: "/tenorfi-logo.png", type: "image/png" },
     ],
     apple: "/favicon.ico",
   },

@@ -314,6 +314,54 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ---- Pricing ---- */}
+      <section className="section" id="pricing" style={{ paddingTop: 0 }}>
+        <div className="wrap">
+          <Reveal>
+            <div className="shead">
+              <span className="eyebrow">Pricing</span>
+              <h2 className="display">
+                Two numbers. <em className="flat">No surprises.</em>
+              </h2>
+              <p className="lead" style={{ marginTop: 18, maxWidth: "52ch" }}>
+                Lock your funding at a fixed annual rate, and pay one small fee when the
+                position opens. No management fees, no spread hidden in the fill, no
+                idle-collateral drag.
+              </p>
+            </div>
+          </Reveal>
+          <Reveal className="pricing">
+            <div className="price-card price-card-dark">
+              <div className="price-glow" />
+              <div className="price-k">Fixed funding rate</div>
+              <div className="price-v">
+                8.0<span className="price-u">% APR</span>
+              </div>
+              <div className="price-d">
+                The rate you lock for the life of the position. Real funding can swing all
+                it wants — yours stays flat.
+              </div>
+            </div>
+            <div className="price-card">
+              <div className="price-k">Creation fee</div>
+              <div className="price-v">
+                15<span className="price-u">bps</span>
+              </div>
+              <div className="price-d">
+                A one-time 0.15% fee on your notional when the position opens — nothing
+                recurring after that.
+              </div>
+            </div>
+          </Reveal>
+          <Reveal>
+            <p className="price-note">
+              No custody, no lockup — your collateral stays live in your wallet as an Aqua
+              virtual balance while it backs the position.
+            </p>
+          </Reveal>
+        </div>
+      </section>
+
       {/* ---- FAQ ---- */}
       <section
         className="section"

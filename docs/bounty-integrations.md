@@ -212,7 +212,7 @@ flowchart LR
     FWD -->|"onReport(metadata, report)"| RECV["KeelFundingReceiver (Base mainnet)"]
     RECV -->|setFundingIndex period, R| IDX["FundingIndex"]
     IDX --> O["_fundingSettle opcode (settlement, over Aqua)"]
-    IDX --> M["MCP get_funding"]
+    IDX --> M["agent get_funding"]
 ```
 
 **The consumer** (`packages/contracts/src/KeelFundingReceiver.sol`) implements Chainlink's
@@ -242,9 +242,9 @@ function setFundingIndex(uint256 period, int256 value) external onlyForwarder {
 ```
 
 **Conventions (locked).**
-- `value = R = AFR` (actual funding rate), **signed `int256`, scale `1e18`, PER-PERIOD** — funding can go negative.
-- **Annualized → per-period conversion happens OFF-CHAIN, in the CRE workflow.** The contract never sees an annualized rate.
-- `period = floor(unixSeconds / PERIOD_SECONDS)`, `PERIOD_SECONDS = 120` for the demo. Everyone (contract, keeper, UI, MCP) uses this exact formula.
+- `value = R = AFR` (actual funding rate), **signed `int256`, scale `1e18`, PER-HOUR** (Hyperliquid's funding interval) — funding can go negative. The index stores the real **hourly** rate; the opcode scales each settlement to its window (`× periodSeconds / 3600`) (reconciled to deployed opcode).
+- **The contract never sees an annualized rate** — the CRE workflow writes the per-hour `1e18` value directly; the per-period scaling is done on-chain by the opcode.
+- `period = floor(unixSeconds / PERIOD_SECONDS)`, `PERIOD_SECONDS = 3600` (hourly) for the demo. Everyone (contract, keeper, UI, agent) uses this exact formula.
 - Set the latch's `onlyForwarder` to the `KeelFundingReceiver` (rotatable via `setForwarder`); the receiver in turn gates `onReport` to the CRE KeystoneForwarder (+ the relayer fallback).
 
 **Hyperliquid funding source** (verify schema on the day):
@@ -255,7 +255,7 @@ function setFundingIndex(uint256 period, int256 value) external onlyForwarder {
 
 **Why it's load-bearing.** Canonical CRE shape: **external API → DON consensus → on-chain state
 change** (`setFundingIndex`), not a UI reading a feed. The index is consumed by two parts of the
-system — the **`_fundingSettle` opcode** (the settlement path, over Aqua) and the MCP's `get_funding`.
+system — the **`_fundingSettle` opcode** (the settlement path, over Aqua) and the agent's `get_funding`.
 
 **Qualification.** CRE workflow as orchestration layer ✓ · integrates a blockchain with an external
 API (Hyperliquid) ✓ · a successful CRE CLI simulation qualifies (they deploy it live for you) — land
@@ -280,7 +280,7 @@ code path, no contract change — but keep ≥1 real CRE write for the bounty.
 
 **What we build.** One-click onboarding: a LI.FI Composer Flow bridges the user's USDC from any chain
 and, in the same flow, (a) funds the Hyperliquid perp (HyperCore) margin and (b) activates the TenorFi
-subscription (authorizes Aqua to pull the fixed premium — **no collateral deposit into TenorFi**). The MCP
+subscription (authorizes Aqua to pull the fixed premium — **no collateral deposit into TenorFi**). The agent
 uses Composer as its execution layer (Agentic Workflows track). *(Section owned by the integration lead;
 design-doc §6 has the flow.)*
 
@@ -295,7 +295,7 @@ flowchart TB
 LI.FI, funding the perp and activating the subscription is a manual multi-step bridge. Composer makes
 "fund the perp + start the subscription" a single confirmation. **Open item (integration lead):** confirm
 a single Flow can chain the Aqua authorization alongside the HL deposit; else two sequenced calls behind
-one MCP confirmation.
+one confirmation.
 
 ---
 

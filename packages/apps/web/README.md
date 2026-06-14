@@ -5,7 +5,7 @@ Next.js web application for TenorFi — On-chain fixed-funding-rate swaps.
 ## Overview
 
 This web app provides:
-- **Landing Page** (`/`) — MCP tutorial, problem explanation, and setup instructions
+- **Landing Page** (`/`) — product tutorial, problem explanation, and setup instructions
 - **Explorer** (`/explorer`) — Browse all funding-rate swaps
 - **Swap Details** (`/explorer/[swapId]`) — Detailed view of individual swaps
 
@@ -57,10 +57,10 @@ The placeholder logo (`public/tenorfi-logo.svg`) will work, but **replace it wit
 
 ### 1. Landing Page (`/`)
 
-Inspired by CoinGecko MCP landing page structure:
+Inspired by CoinGecko landing page structure:
 - **Hero** — Value proposition + stats
 - **Problem Section** — Ethena story ($8B bleed)
-- **Connect MCP** — Tabbed installation (Claude Desktop, Claude Code, Cline, Cursor)
+- **Get Started** — Setup and connection instructions
 - **Example Prompts** — Natural language queries you can ask
 - **How It Works** — 3-step flow
 - **Feature Grid** — 6 capability cards
@@ -98,7 +98,7 @@ Individual swap view:
 
 ## Mock Data
 
-All data is currently mocked in `src/lib/mock-data.ts`:
+All data is currently mocked in `src/lib/tenorfi-data.ts`:
 - Swaps
 - Settlements
 - Funding rate history
@@ -129,7 +129,7 @@ apps/web/
 │   │   ├── explorer/         # Explorer components
 │   │   └── shared/           # Header, Footer, CodeBlock
 │   ├── lib/
-│   │   ├── mock-data.ts      # Mock data (replace later)
+│   │   ├── tenorfi-data.ts   # Mock data (replace later)
 │   │   └── utils.ts          # Helper functions
 │   └── types/
 │       └── swap.ts           # TypeScript types

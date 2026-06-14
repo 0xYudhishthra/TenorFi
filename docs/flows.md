@@ -8,12 +8,11 @@
 > **Chain:** Base mainnet (chain id 8453) — real funds/gas; keep demo position sizes small.
 > **Funding source:** Hyperliquid (the funding rate is read on-chain by Chainlink CRE).
 
-> ⚠️ **Design direction (current).** This describes the **subscription / just-in-time-premium** model:
-> the user posts **no collateral**, 1inch Aqua pulls a **fixed premium** from their wallet each hour, and
-> TenorFi **covers their actual funding** on Hyperliquid. The **deployed** Base contracts still implement the
-> *prior* model — **net** `(R − F)` settlement from **pre-shipped Aqua virtual balances** — so the
-> on-chain code is mid-migration. Don't present the subscription model as fully live on-chain until the
-> contracts ship. (Synced with the team — see §B.0 for what's actually deployed today.)
+> ✅ **Design direction (deployed).** This describes the **subscription / just-in-time-premium** model:
+> the user posts **no collateral**, 1inch Aqua pulls a **fixed premium** from their wallet (`R < F`), and
+> TenorFi **covers their actual funding** on Hyperliquid (`R > F`). This is **what the live Base contracts
+> implement today** — a single `_fundingSettle` order serving both directions with zero subscriber
+> collateral (reconciled to deployed opcode). (See §B.0 for the deployed addresses.)
 
 ---
 
@@ -36,8 +35,8 @@ speculators provide it.)*
 
 | Actor / component | Role |
 |---|---|
-| **User + their agent** (Claude Code / Codex / any MCP client) | The **hedger** — a leveraged perp long who wants their funding cost fixed. Speaks in natural language; the agent acts through the TenorFi MCP. |
-| **TenorFi MCP** | The front door. Reads funding, lists offers, builds the transactions, routes the funding coverage to the user's HL margin. *Proposes; the human confirms.* |
+| **User + their agent** | The **hedger** — a leveraged perp long who wants their funding cost fixed. Speaks in natural language; the agent acts on their behalf. |
+| **TenorFi agent** | The front door. Reads funding, lists offers, builds the transactions, routes the funding coverage to the user's HL margin. *Proposes; the human confirms.* |
 | **LI.FI Composer** | The on-ramp. Brings the user's USDC cross-chain to fund the **Hyperliquid perp** and authorize the **TenorFi subscription** in one Flow. |
 | **Hyperliquid** | Where the real perp lives (leg 1). Also the **funding-rate data source** (read by Chainlink). |
 | **TenorFi contracts** (Base mainnet) | The subscription engine (leg 2): the `_fundingSettle` Aqua opcode (`TenorSwapVMRouter` + `TenorFundingProgram`). Pulls the fixed premium from the user's wallet via Aqua each period — **no custody, no user-posted collateral**. |
@@ -49,7 +48,7 @@ speculators provide it.)*
 **The core idea (what makes it different):** **you lock up no collateral.** Strips/IPOR make you post
 margin that sits dead for weeks; TenorFi pulls a small **fixed premium** from your wallet each hour — pay as
 you go — and **covers your actual funding** in return. TenorFi reads the funding rate on-chain via Chainlink to
-know exactly what to cover; the MCP routes the coverage to your Hyperliquid margin so your net cost stays
+know exactly what to cover; the agent routes the coverage to your Hyperliquid margin so your net cost stays
 pinned at the fixed rate.
 
 **Two rates (used everywhere below):**
@@ -63,12 +62,12 @@ pinned at the fixed rate.
 **1 — Ask, in one conversation.**
 > *User → agent:* "Open a $5,000 BTC long on Hyperliquid and fix my funding rate."
 
-**2 — Quote.** The MCP returns a single quote, a `{fixed rate, coverage}`. **The fixed rate is 7.3% APR** — the fair/break-even rate from a year of real BTC funding. **Coverage auto-scales to ≈ 1.5% of the position** — for this $5,000 long that's ~**$75**, pre-funded by the reserve.
+**2 — Quote.** The agent returns a single quote, a `{fixed rate, coverage}`. **The fixed rate is 7.3% APR** — the fair/break-even rate from a year of real BTC funding. **Coverage auto-scales to ≈ 1.5% of the position** — for this $5,000 long that's ~**$75**, pre-funded by the reserve.
 
 *(**Coverage = the reserve's pre-locked collateral** = its cumulative payout budget over the swap's life, ≈ 1.5% of notional — **not** `cap × notional` (that is only the per-period clamp). One fixed rate for everyone; coverage is set by the position size. The 7.3% rate, the cap and the 1.5% sizing are all validated against a year of real BTC funding — `docs/research/analysis.md`. The user posts none of the coverage.)*
 
 **3 — Confirm + sign once.**
-> *User:* "Do it." → *MCP:* "Done — sign once." → **one signature** (opens the perp + authorizes the
+> *User:* "Do it." → *Agent:* "Done — sign once." → **one signature** (opens the perp + authorizes the
 > Aqua premium pulls).
 
 **4 — Position live.** The perp is open and the TenorFi subscription is active. **No collateral is locked** —
@@ -101,32 +100,32 @@ The intersection between the CRE write path and the Aqua read path is a **single
 |---|---|
 | `FundingIndex` (the seam) | `0x545f162204A92CEbeb12AA0A4AaDF777d6905005` (Base mainnet) — **the Aqua order's `fundingIndex` must point here** |
 | `KeelFundingReceiver` (CRE consumer) | `0x7b7Ca2269f865C3448015173D433CcD7782aF582` |
-| `PERIOD_SECONDS` | **3600** (must match in the order) |
+| `PERIOD_SECONDS` | **3600** (hourly — matches Hyperliquid funding interval + the CRE write) |
 | Settlement token (`tokenOut`) | canonical Base USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` |
 | Aqua (canonical, reused) | `0x499943E74FB0cE105688beeE8Ef2ABec5D936d31` |
 | Aqua settlement layer (router + program + position token) | deploys with the rest of the stack in one shot via `script/Deploy.s.sol` |
 
 The CRE write path is **live and verified on-chain** (real Hyperliquid funding written into `FundingIndex`).
-What remains is wiring the subscription premium-pull + funding-coverage settlement and a keeper (see §D).
-*(The deployed opcode currently settles the **net** `(R − F)` from pre-shipped balances; the premium-pull /
-coverage split below is the migration — see the banner at the top.)*
+The subscription settlement is also deployed: a single `_fundingSettle` order pays coverage (`R > F`) or
+pulls the premium from the wallet (`R < F`), with **zero subscriber collateral** (reconciled to deployed
+opcode). What remains is the keeper loop (see §D).
 
 ### B.1 — Onboarding (one user signature)
 
 ```mermaid
 flowchart TB
-    AGENT["User + agent → TenorFi MCP<br/>'long BTC $5k + fix funding' → pick 5% offer → sign once"] --> FLOW["LI.FI Composer Flow<br/>(cross-chain USDC, one signature)"]
-    FLOW --> HL["Fund the Hyperliquid perp (HyperCore)<br/>MCP fires the perp order via HL API"]
+    AGENT["User + agent<br/>'long BTC $5k + fix funding' → take 7.3% offer → sign once"] --> FLOW["LI.FI Composer Flow<br/>(cross-chain USDC, one signature)"]
+    FLOW --> HL["Fund the Hyperliquid perp (HyperCore)<br/>agent fires the perp order via HL API"]
     FLOW --> TENORFI["Activate the TenorFi subscription<br/>authorize Aqua to pull the fixed premium"]
     TENORFI --> WALLET["No collateral locked<br/>→ premium pulled from the wallet, just-in-time, each period"]
 ```
 
 *LI.FI bridges the user's USDC cross-chain to **fund the Hyperliquid perp margin** and the user **authorizes
-the Aqua premium pulls** — the perp order itself is fired by the MCP via the Hyperliquid API in the same
+the Aqua premium pulls** — the perp order itself is fired by the agent via the Hyperliquid API in the same
 flow (LI.FI does not place the order). The user **deposits no collateral into TenorFi**; the premium is pulled
 from their wallet only when due.*
 *Open item (integration lead): confirm the Composer Flow can chain the Aqua authorization after the bridge in
-one Flow; else two sequenced calls behind one MCP confirmation.*
+one Flow; else two sequenced calls behind one confirmation.*
 
 ### B.2 — The oracle (each period)
 
@@ -138,14 +137,16 @@ flowchart LR
     RECV -->|setFundingIndex| IDX["FundingIndex (write-once)"]
 ```
 
-- The CRE workflow reads Hyperliquid's `funding` (already an **hourly** fractional rate) and scales it to a
-  **signed `1e18` per-period** value **off-chain** (`toScaled1e18`); the contract only ever sees `R` as that
-  per-period `1e18` value — never an annualized rate.
-- `period = floor(unixSeconds / PERIOD_SECONDS)`. **The live deployment uses `PERIOD_SECONDS = 3600`** (the
-  hourly funding window) — this is the value baked into the deployed CRE config, so the Aqua order **must be
-  built with the same `3600`** or the opcode reads a different period bucket than CRE wrote. *(To compress
-  the demo, lower `PERIOD_SECONDS` on **both** the CRE config and the order together; the relayer fallback
-  can then latch periods quickly.)*
+- The CRE workflow reads Hyperliquid's `funding` (already an **hourly** fractional rate) and writes it
+  on-chain as a **signed `1e18` per-hour** value (`toScaled1e18`); the index stores the real **hourly** rate.
+  `R` and the fixed rate `F` are both quoted **per hour** — never an annualized rate (reconciled to deployed
+  opcode). The opcode scales each settlement to its own window (`× periodSeconds / 3600`); at the hourly
+  demo value this scale is **×1** (one full hour per settlement).
+- `period = floor(unixSeconds / PERIOD_SECONDS)`. **The demo uses `PERIOD_SECONDS = 3600`** (hourly) — this
+  is the value the shipped/settled order uses, and it matches the **hourly slots** the CRE workflow writes
+  (Hyperliquid funding updates hourly, so an hourly slot carries the same value a per-minute slot would).
+  The order's `PERIOD_SECONDS` and the CRE config must match, or the opcode reads a different period bucket
+  than CRE wrote.
 - The index is **write-once** per period (immutable once it has settled real cashflow). Only the
   `KeelFundingReceiver` may write it; it accepts an owner-rotatable **EOA relayer** as a liveness fallback
   if the DON is flaky.
@@ -168,11 +169,12 @@ Each period, two flows make the user's cost fixed:
 The reserve's per-period P&L is `(FFR − AFR) × notional`: it keeps the spread when funding is calm and eats
 the gap when funding spikes (bounded by the cap). The user's net is always the fixed rate.
 
-> **On-chain today (divergence):** the deployed `_fundingSettle` opcode settles the **net** difference
-> `clamp(R − F, ±cap) × notional` from **pre-shipped Aqua virtual balances** (two mirror orders,
-> directional, `UnauthorizedTaker`-bound, double-settle guarded) — it does **not** yet split the
-> premium-pull from the coverage, and the user still ships a balance. Economically the net is the same; the
-> subscription split (zero user collateral, premium pulled just-in-time) is the migration. See
+> **On-chain today:** the deployed `_fundingSettle` opcode is a **single order serving both directions**
+> (`UnauthorizedTaker`-bound, double-settle guarded) with **zero subscriber collateral** — `amountOut`
+> covers the funding when `R > F` (paid from the reserve's shipped Aqua balance) and `amountIn` pulls the
+> premium from the subscriber's wallet when `R < F` (with a 1-wei position-marker receipt). It scales the
+> per-hour net `clamp(R − F, ±cap) × notional` to each window (`× periodSeconds / 3600`). This **is** the
+> subscription model (reconciled to deployed opcode). See
 > [`bounty-integrations.md`](bounty-integrations.md) for the deployed opcode.
 
 ### No default, by design
@@ -189,7 +191,7 @@ So default risk lives only on the insurer's side, and it's bounded + pre-funded.
 
 ---
 
-## C. The MCP tool surface
+## C. The agent tool surface
 
 - **Read:** `get_funding(market)` (AFR via Chainlink), `list_offers()` (the insurer's fixed-rate offers),
   `get_position(addr)`, `preview_settle(swapId, realized)`.
@@ -210,7 +212,7 @@ cashflow deterministically, and at the brink the **human confirms**.
 
 | Capability | Status |
 |---|---|
-| MCP conversation → 3 offers → one signature | **Demo** |
+| Agent conversation → offer → one signature | **Demo** |
 | LI.FI Composer funds the perp + activates the subscription (no user collateral) | **Demo** |
 | **One real settlement tick** (Aqua pulls the premium; reserve covers funding) on Base mainnet | **Demo** |
 | The full per-period loop running hour after hour | Roadmap (narrated) |

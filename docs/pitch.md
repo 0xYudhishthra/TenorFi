@@ -26,7 +26,7 @@
 
 Positioning (internal): we are **not the first** funding-rate swap (Strips, Rho, IPOR exist). We win on
 **framing + execution** — *the interest-rate swap that makes perps institutional*, Aqua-native, **zero
-collateral** (pay as you go), and an agent (MCP) front door. If a judge names a competitor, we agree and
+collateral** (pay as you go), and an agent front door. If a judge names a competitor, we agree and
 pivot to *"and we made it Aqua-native, non-custodial, zero-collateral — and we point it at the people who
 can't hold perps today: institutions."*
 
@@ -102,7 +102,7 @@ Net:                          − fixed   (constant, hedged)
 
 ## 4. The live demo (~90s, agent-driven)
 
-**Form:** the **MCP chat** is the star; a **minimal one-screen panel** (reads on-chain) shows the position,
+**Form:** the **agent chat** is the star; a **minimal one-screen panel** (reads on-chain) shows the position,
 the **next premium**, **AFR vs FFR** live, and the settlement feed. No fake orderbook, no candlesticks.
 
 **Scope shown live:** open the position + **one real settlement tick**. The infinite loop and the
@@ -114,18 +114,18 @@ brink/human checkpoint are narrated as roadmap, not performed.
 | **FFR** = Fixed Funding Rate (the locked rate) | what you agreed to pay |
 
 **Beat 1 — Open by conversation.**
-> *User → agent (Claude Code / Codex / any MCP client):* "Open a $5,000 BTC long on Hyperliquid and fix my
+> *User → agent:* "Open a $5,000 BTC long on Hyperliquid and fix my
 > funding rate."
-> *MCP:* "Your fixed rate is **7.3% APR** — the fair rate, from a year of real BTC funding. Coverage
+> *Agent:* "Your fixed rate is **7.3% APR** — the fair rate, from a year of real BTC funding. Coverage
 > auto-scales to **1.5% of your position** — for $5,000 that's **$75** the reserve pre-funds. Sign once."
-> *User:* "Do it." → *MCP:* "Done — sign once."
+> *User:* "Do it." → *Agent:* "Done — sign once."
 
 **Beat 2 — One click, no collateral (LI.FI Composer).** On that one signature, a LI.FI Composer Flow brings
 the user's USDC, **funds the Hyperliquid perp**, and **activates the subscription** (authorizes Aqua to
 pull the premium) — **nothing is deposited into TenorFi as collateral**. The panel shows: HL position open,
 subscription active, **FFR = 7.3%**, **AFR live**, next premium.
 > *(Honesty: LI.FI funds the perp and the user authorizes the premium pull; the perp order itself is fired
-> by the MCP via the Hyperliquid API in the same flow. We don't say "LI.FI places the perp.")*
+> by the agent via the Hyperliquid API in the same flow. We don't say "LI.FI places the perp.")*
 
 **Beat 3 — The settlement tick (the heart).** Chainlink CRE posts the period's funding to the on-chain
 index (via `KeelFundingReceiver.onReport`); the keeper fires the settlement. On screen: **real USDC moves
@@ -166,7 +166,7 @@ Drop one or two of these when relevant — they're true and they land:
 
 - **"Our settlement opcode runs against the real, deployed 1inch Aqua and real USDC — on a Base mainnet
   fork, not a mock."** (`test/swapvm/BaseMainnetFork.t.sol`)
-- **"35 tests, a Slither pass, and an adversarial security audit that found and fixed two high-severity
+- **"39 passing tests, a Slither pass, and an adversarial security audit that found and fixed two high-severity
   bugs"** (an order anyone could take to steal the payout; a sign-drop that made the maker pay both ways).
   See [`security-review.md`](security-review.md).
 - **"The funding oracle is a real Chainlink CRE consumer"** (`KeelFundingReceiver` implements the canonical
@@ -223,7 +223,7 @@ doing something it was never shown doing."
 > collateral:** 1inch Aqua pulls a small fixed premium from your wallet as you go, and we cover your
 > funding. We don't bet. The coverage is pre-funded and funding is capped, so the worst case is already
 > paid — no default by design. It settles every period against a Chainlink funding feed, and an agent
-> drives the whole thing through an MCP. Watch the trade that would have saved Ethena — live, on Base."
+> drives the whole thing. Watch the trade that would have saved Ethena — live, on Base."
 
 **Closing line (pick by room):**
 > "**Lock the rate that broke the safest fund in crypto.**"

@@ -40,6 +40,7 @@ contract KeelSwapTest is Test {
     // --- helpers ---
 
     function _open(uint256 hCol, uint256 sCol) internal returns (uint256 id) {
+        vm.prank(hedger); // a named party must open
         id = keel.open(hedger, speculator, NOTIONAL, FIXED, CAP, START, END, hCol, sCol);
     }
 
@@ -76,8 +77,15 @@ contract KeelSwapTest is Test {
     }
 
     function test_open_revertsSameParty() public {
+        vm.prank(hedger);
         vm.expectRevert(KeelSwap.SamePartySwap.selector);
         keel.open(hedger, hedger, NOTIONAL, FIXED, CAP, START, END, 10_000e6, 10_000e6);
+    }
+
+    function test_open_revertsForNonParticipant() public {
+        vm.prank(makeAddr("intruder"));
+        vm.expectRevert(KeelSwap.NotParticipant.selector);
+        keel.open(hedger, speculator, NOTIONAL, FIXED, CAP, START, END, 10_000e6, 10_000e6);
     }
 
     // --- net cashflow math ---

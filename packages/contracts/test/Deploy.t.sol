@@ -13,19 +13,20 @@ contract DeployTest is Test {
         Deploy dep = new Deploy();
         address forwarder = address(0xCAFE);
         address relayer = address(0xBEE5);
-        Deploy.Deployed memory d = dep.deploy(forwarder, relayer);
+        // zero aqua/usdc -> deploy mocks (local dry-run)
+        Deploy.Deployed memory d = dep.deploy(forwarder, relayer, address(0), address(0));
 
         // every contract has code
-        assertGt(address(d.usdc).code.length, 0, "usdc");
+        assertGt(d.usdc.code.length, 0, "usdc");
         assertGt(address(d.fundingIndex).code.length, 0, "fundingIndex");
         assertGt(address(d.receiver).code.length, 0, "receiver");
         assertGt(address(d.keelSwap).code.length, 0, "keelSwap");
-        assertGt(address(d.aqua).code.length, 0, "aqua");
+        assertGt(d.aqua.code.length, 0, "aqua");
         assertGt(address(d.router).code.length, 0, "router");
         assertGt(address(d.program).code.length, 0, "program");
 
         // settlement core wired to the right collateral token + funding index
-        assertEq(address(d.keelSwap.collateralToken()), address(d.usdc));
+        assertEq(address(d.keelSwap.collateralToken()), d.usdc);
         assertEq(address(d.keelSwap.fundingIndex()), address(d.fundingIndex));
 
         // the CRE receiver is the index's authorized writer, and the receiver knows its

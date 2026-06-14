@@ -4,6 +4,7 @@
 
 - **Design doc** (source of truth): [`docs/design-doc.md`](docs/design-doc.md)
 - **Bounty integrations** (1inch · Chainlink · LI.FI — diagrams + code): [`docs/bounty-integrations.md`](docs/bounty-integrations.md)
+- **Security review** (Slither triage + on-chain checks): [`docs/security-review.md`](docs/security-review.md)
 - **Settlement core**: [`packages/contracts`](packages/contracts) · **Aqua opcode**: [`packages/contracts/src/swapvm`](packages/contracts/src/swapvm)
 
 ---
@@ -102,7 +103,9 @@ Everything is one Foundry package:
 ```bash
 cd packages/contracts
 pnpm install          # @1inch/swap-vm + @1inch/aqua (needed to build the SwapVM opcode)
-forge test            # 44 tests
+forge test            # 45 tests
+# integration vs the real deployed Aqua + USDC on a Base mainnet fork (+2 tests):
+BASE_RPC_URL=https://mainnet.base.org forge test --match-contract BaseMainnetFork
 ```
 
 Deploy to Base mainnet:

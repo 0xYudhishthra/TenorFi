@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
-import { IReceiver } from "./interfaces/IReceiver.sol";
-import { FundingIndex } from "./FundingIndex.sol";
+import {IReceiver} from "./interfaces/IReceiver.sol";
+import {FundingIndex} from "./FundingIndex.sol";
 
 /// @title KeelFundingReceiver
 /// @notice Canonical Chainlink CRE consumer for the funding oracle. The DON-signed report is
@@ -87,6 +87,7 @@ contract KeelFundingReceiver is IReceiver {
 
     /// @inheritdoc IERC165
     function supportsInterface(bytes4 interfaceId) external pure override returns (bool) {
-        return interfaceId == type(IReceiver).interfaceId || interfaceId == type(IERC165).interfaceId;
+        return
+            interfaceId == type(IReceiver).interfaceId || interfaceId == type(IERC165).interfaceId;
     }
 }

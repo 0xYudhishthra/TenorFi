@@ -129,6 +129,11 @@ contract KeelSwap {
         if (hedger == address(0) || speculator == address(0)) {
             revert ZeroAddress();
         }
+        // Only a named party may open the swap, so a third party can't pull collateral from
+        // arbitrary addresses that happen to have approved this contract. (The counterparty
+        // must still have approved its collateral; the consent-safe path is the Aqua opcode,
+        // where each side `ship`s its own strategy.)
+        if (msg.sender != hedger && msg.sender != speculator) revert NotParticipant();
         if (hedger == speculator) revert SamePartySwap();
         if (notional == 0) revert ZeroNotional();
         if (cap == 0) revert ZeroCap();

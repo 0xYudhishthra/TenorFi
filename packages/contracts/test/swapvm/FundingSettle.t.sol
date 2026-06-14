@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import { Test } from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 
-import { FundingSettle, FundingSettleArgsBuilder } from "../../src/swapvm/FundingSettle.sol";
-import { FundingSettleHarness } from "./FundingSettleHarness.sol";
-import { MockFundingIndex } from "./MockFundingIndex.sol";
+import {FundingSettle, FundingSettleArgsBuilder} from "../../src/swapvm/FundingSettle.sol";
+import {FundingSettleHarness} from "./FundingSettleHarness.sol";
+import {MockFundingIndex} from "./MockFundingIndex.sol";
 
 /// @notice Unit tests for the `_fundingSettle` opcode logic:
 ///         amountOut = clamp(R - F, ±cap) * N / 1e18.

@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import { ISwapVM } from "@1inch/swap-vm/src/interfaces/ISwapVM.sol";
-import { MakerTraitsLib } from "@1inch/swap-vm/src/libs/MakerTraits.sol";
-import { ProgramBuilder, Program } from "@1inch/swap-vm/test/utils/ProgramBuilder.sol";
+import {ISwapVM} from "@1inch/swap-vm/src/interfaces/ISwapVM.sol";
+import {MakerTraitsLib} from "@1inch/swap-vm/src/libs/MakerTraits.sol";
+import {ProgramBuilder, Program} from "@1inch/swap-vm/test/utils/ProgramBuilder.sol";
 
-import { KeelOpcodes } from "./KeelOpcodes.sol";
-import { FundingSettleArgsBuilder } from "./FundingSettle.sol";
+import {KeelOpcodes} from "./KeelOpcodes.sol";
+import {FundingSettleArgsBuilder} from "./FundingSettle.sol";
 
 /// @title KeelFundingProgram — builds the maker's funding-settlement order
 /// @notice Program = a single `_fundingSettle` instruction. The maker (LP / payer) ships a
@@ -18,7 +18,7 @@ import { FundingSettleArgsBuilder } from "./FundingSettle.sol";
 contract KeelFundingProgram is KeelOpcodes {
     using ProgramBuilder for Program;
 
-    constructor(address aqua) KeelOpcodes(aqua) { }
+    constructor(address aqua) KeelOpcodes(aqua) {}
 
     function buildProgram(
         address maker,
@@ -29,8 +29,10 @@ contract KeelFundingProgram is KeelOpcodes {
         uint256 periodSeconds
     ) external pure returns (ISwapVM.Order memory) {
         Program memory program = ProgramBuilder.init(_opcodes());
-        bytes memory bytecode =
-            program.build(_fundingSettle, FundingSettleArgsBuilder.build(fundingIndex, fixedRate, cap, notional, periodSeconds));
+        bytes memory bytecode = program.build(
+            _fundingSettle,
+            FundingSettleArgsBuilder.build(fundingIndex, fixedRate, cap, notional, periodSeconds)
+        );
 
         return MakerTraitsLib.build(
             MakerTraitsLib.Args({

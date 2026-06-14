@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import { Test } from "forge-std/Test.sol";
-import { ISwapVM } from "@1inch/swap-vm/src/interfaces/ISwapVM.sol";
+import {Test} from "forge-std/Test.sol";
+import {ISwapVM} from "@1inch/swap-vm/src/interfaces/ISwapVM.sol";
 
-import { Deploy } from "../script/Deploy.s.sol";
+import {Deploy} from "../script/Deploy.s.sol";
 
 /// @notice Exercises the deploy script's `deploy()` (no broadcast) and asserts the stack is
 ///         deployed and wired — a dry-run before the real Ethereum Sepolia broadcast.
@@ -28,8 +28,10 @@ contract DeployTest is Test {
         assertEq(d.fundingIndex.forwarder(), forwarder);
 
         // the program builder produces a non-empty funding-settlement order
-        ISwapVM.Order memory order =
-            d.program.buildProgram(address(0xBEEF), address(d.fundingIndex), int256(1e16), 4e16, 50_000e6, 120);
+        ISwapVM.Order memory order = d.program
+            .buildProgram(
+                address(0xBEEF), address(d.fundingIndex), int256(1e16), 4e16, 50_000e6, 120
+            );
         assertEq(order.maker, address(0xBEEF));
         assertGt(order.data.length, 0, "program bytecode");
     }

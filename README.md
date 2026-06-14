@@ -72,7 +72,7 @@ flowchart TB
 | Component | Status | Where |
 |-----------|--------|-------|
 | Settlement core (`KeelSwap` + `FundingIndex`) | **Built · 25 tests** | `packages/contracts/src` |
-| Custom SwapVM opcode (`_fundingSettle` + router + program) | **Built · unit-tested (4)**; live Sepolia settlement pending | `packages/contracts/src/swapvm` |
+| Custom SwapVM opcode (`_fundingSettle` + router + program) | **Built · unit + e2e** (settlement moves real USDC via Aqua) · double-settle guarded; Sepolia deploy pending | `packages/contracts/src/swapvm` |
 | Deploy script + wiring test (Ethereum Sepolia) | **Built · 1 test** | `packages/contracts/script` |
 | Chainlink CRE funding oracle | Planned (M2) | `packages/cre` |
 | LI.FI cross-chain onboarding | Planned | integration lead |

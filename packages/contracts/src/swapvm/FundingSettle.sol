@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import { Context, ContextLib } from "@1inch/swap-vm/src/libs/VM.sol";
+import {Context, ContextLib} from "@1inch/swap-vm/src/libs/VM.sol";
 
 interface IFundingIndex {
     function getFundingIndex(uint256 period) external view returns (int256 value, bool set);
@@ -28,24 +28,39 @@ library FundingSettleArgsBuilder {
 ///         clamps to the per-period cap, and writes the net to `ctx.swap.amountOut` so the
 ///         router delivers it from the payer (maker) to the receiver (taker).
 /// @dev    `period` is derived from `block.timestamp`, so the maker's program is fixed (no
-///         per-period re-ship) and the taker cannot choose a favourable period. Mixed into a
-///         router via `_opcodes()`.
+///         per-period re-ship) and the taker cannot choose a favourable period. Each
+///         (order, period) settles at most once. Mixed into a router via `_opcodes()`.
 abstract contract FundingSettle {
     using ContextLib for Context;
 
     uint256 internal constant RATE_ONE = 1e18;
 
+    /// @notice orderHash => period => settled. Prevents settling the same period twice.
+    mapping(bytes32 => mapping(uint256 => bool)) public settled;
+
     error FundingNotSet();
+    error AlreadySettled();
 
     /// @param ctx  SwapVM execution context (mutated: `ctx.swap.amountOut`).
     /// @param args abi.encode(fundingIndex, fixedRate, cap, notional, periodSeconds).
-    function _fundingSettle(Context memory ctx, bytes calldata args) internal view {
-        (address fundingIndex, int256 fixedRate, uint256 cap, uint256 notional, uint256 periodSeconds) =
-            abi.decode(args, (address, int256, uint256, uint256, uint256));
+    function _fundingSettle(Context memory ctx, bytes calldata args) internal {
+        (
+            address fundingIndex,
+            int256 fixedRate,
+            uint256 cap,
+            uint256 notional,
+            uint256 periodSeconds
+        ) = abi.decode(args, (address, int256, uint256, uint256, uint256));
 
         uint256 period = block.timestamp / periodSeconds;
         (int256 realized, bool isSet) = IFundingIndex(fundingIndex).getFundingIndex(period);
         require(isSet, FundingNotSet());
+
+        // No double-settle. Skipped during static quoting (cannot SSTORE in a staticcall).
+        if (!ctx.vm.isStaticContext) {
+            if (settled[ctx.query.orderHash][period]) revert AlreadySettled();
+            settled[ctx.query.orderHash][period] = true;
+        }
 
         int256 diff = _clamp(realized - fixedRate, cap); // clamp(R - F, ±cap)
         ctx.swap.amountOut = (_abs(diff) * notional) / RATE_ONE; // net delivered: maker(payer) -> taker(receiver)

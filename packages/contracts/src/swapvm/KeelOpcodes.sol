@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import { Context } from "@1inch/swap-vm/src/libs/VM.sol";
-import { AquaOpcodes } from "@1inch/swap-vm/src/opcodes/AquaOpcodes.sol";
+import {Context} from "@1inch/swap-vm/src/libs/VM.sol";
+import {AquaOpcodes} from "@1inch/swap-vm/src/opcodes/AquaOpcodes.sol";
 
-import { FundingSettle } from "./FundingSettle.sol";
+import {FundingSettle} from "./FundingSettle.sol";
 
 /// @title KeelOpcodes — Aqua opcode set extended with `_fundingSettle`
 /// @notice Shared base for the router (execution) and the program builder (encoding), so the
@@ -12,7 +12,7 @@ import { FundingSettle } from "./FundingSettle.sol";
 ///         instruction is appended at the END of the set, preserving every existing index
 ///         (the convention the swap-vm comments require for backward compatibility).
 abstract contract KeelOpcodes is AquaOpcodes, FundingSettle {
-    constructor(address aqua) AquaOpcodes(aqua) { }
+    constructor(address aqua) AquaOpcodes(aqua) {}
 
     function _opcodes()
         internal

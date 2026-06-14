@@ -35,14 +35,14 @@ contract Settle is Script {
     address internal constant FUNDING_INDEX = 0x545f162204A92CEbeb12AA0A4AaDF777d6905005;
     address internal constant USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
 
-    uint256 internal constant PERIOD_SECONDS = 60; // per-minute demo; must match the shipped order
+    uint256 internal constant PERIOD_SECONDS = 3600; // hourly — must match the shipped order + CRE config
     uint256 internal constant RATE_ONE = 1e18;
 
     function run() external {
         uint256 pk = vm.envUint("PRIVATE_KEY"); // the subscriber (the bound taker)
         address subscriber = vm.addr(pk);
         address maker = vm.envAddress("MAKER"); // the insurance reserve (order maker)
-        int256 fixedRate = vm.envOr("FIXED_RATE", int256(8_333_333_333_333)); // 7.3% APR per-HOUR; demo compresses time (each minute = one funding-hour), so no /60
+        int256 fixedRate = vm.envOr("FIXED_RATE", int256(8_333_333_333_333)); // 7.3% APR as a per-HOUR rate (1e18); periodSeconds=3600 → opcode scale is 3600/3600 = 1 (one full hour)
         uint256 cap = vm.envOr("CAP", uint256(4e16));
         uint256 notional = vm.envOr("NOTIONAL", uint256(100e6));
 

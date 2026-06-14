@@ -34,7 +34,7 @@ contract Ship is Script {
     address internal constant FUNDING_INDEX = 0x545f162204A92CEbeb12AA0A4AaDF777d6905005;
     address internal constant USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
 
-    uint256 internal constant PERIOD_SECONDS = 60; // per-minute (demo); must match the CRE config
+    uint256 internal constant PERIOD_SECONDS = 3600; // hourly — matches the hourly CRE funding write
 
     function run() external {
         uint256 pk = vm.envUint("PRIVATE_KEY"); // the reserve wallet
@@ -46,9 +46,9 @@ contract Ship is Script {
         // new FIXED_RATE; existing positions keep their locked rate (no redeploy, no global setter).
         // 7.3% APR (the fair/break-even rate from a year of real BTC funding — see
         // docs/research/analysis.md) as a PER-HOUR rate in WAD: 7.3e16 / 8760 ≈ 8.33e12 — the same
-        // (hourly) frame as the realized funding the CRE records. The demo runs periodSeconds=60 as
-        // COMPRESSED time (each minute = one funding-hour): the relayer writes the real hourly value
-        // into each minute-slot and each minute settles one full hour's amount — no division.
+        // (hourly) frame as the realized funding the CRE records. periodSeconds=3600 matches the
+        // hourly CRE write, so each period reads the hourly slot CRE latched and settles one full
+        // hour (the opcode's periodSeconds/3600 scale is ×1).
         int256 fixedRate = vm.envOr("FIXED_RATE", int256(8_333_333_333_333));
         uint256 cap = vm.envOr("CAP", uint256(4e16)); // 4% per-period clamp
         require(fixedRate > 0, "fixedRate must be positive");

@@ -27,6 +27,9 @@ packages/contracts/broadcast/
 .DS_Store
 *.log
 packages/lifi/deposit.html
+*.db
+*.db-wal
+*.db-shm
 coverage/
 .idea/
 .vscode/

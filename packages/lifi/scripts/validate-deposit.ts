@@ -8,8 +8,22 @@
 // Env: DEPOSIT_FROM_ADDRESS (friend's address), DEPOSIT_FROM_CHAIN (8453 Base),
 //      DEPOSIT_AMOUNT (5000000 = 5 USDC), MONITOR_TX (poll an existing tx).
 import { writeFileSync } from "node:fs";
+import { encodeFunctionData } from "viem";
 import { getStatus } from "@lifi/sdk";
 import { buildHyperCoreDeposit, CHAINS, createLifiClient } from "../src/index.js";
+
+const ERC20_APPROVE_ABI = [
+  {
+    type: "function",
+    name: "approve",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "spender", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [{ type: "bool" }],
+  },
+] as const;
 
 const fromChain = Number(process.env.DEPOSIT_FROM_CHAIN ?? String(CHAINS.base));
 const lifi = createLifiClient();
@@ -45,10 +59,22 @@ if (monitorTx) {
   if (!req?.to) throw new Error("quote returned no transactionRequest");
   const valueHex = req.value ? `0x${BigInt(req.value).toString(16)}` : "0x0";
 
+  // The router pulls USDC via transferFrom, so it needs an allowance first.
+  const fromToken = step.action.fromToken?.address as `0x${string}` | undefined;
+  const spender = (step.estimate.approvalAddress ?? req.to) as `0x${string}`;
+  if (!fromToken) throw new Error("quote has no fromToken address");
+  const approveData = encodeFunctionData({
+    abi: ERC20_APPROVE_ABI,
+    functionName: "approve",
+    args: [spender, BigInt(step.estimate.fromAmount)],
+  });
+
   const html = renderHtml({
     fromAddress,
     chainIdHex: `0x${Number(req.chainId ?? fromChain).toString(16)}`,
     chainId: Number(req.chainId ?? fromChain),
+    approveTo: fromToken,
+    approveData,
     to: req.to,
     data: req.data ?? "0x",
     valueHex,
@@ -66,6 +92,8 @@ function renderHtml(tx: {
   fromAddress: string;
   chainIdHex: string;
   chainId: number;
+  approveTo: string;
+  approveData: string;
   to: string;
   data: string;
   valueHex: string;
@@ -75,34 +103,38 @@ function renderHtml(tx: {
   return `<!doctype html>
 <html><head><meta charset="utf-8"><title>Keel — HyperCore deposit</title>
 <style>body{font:14px system-ui;max-width:640px;margin:40px auto;padding:0 16px}
-button{font:inherit;padding:8px 14px;margin:4px 0;cursor:pointer}pre{background:#f4f4f4;padding:10px;overflow:auto}</style>
+button{font:inherit;padding:8px 14px;margin:4px 0;cursor:pointer}pre{background:#f4f4f4;padding:10px;overflow:auto;white-space:pre-wrap}</style>
 </head><body>
 <h2>Keel — deposit ${tx.amountUsdc} USDC into HyperCore</h2>
-<p>Sign with the wallet <code>${tx.fromAddress}</code> on <b>Base</b> (chainId ${tx.chainId}). Route: <code>${tx.tool}</code>.</p>
+<p>Sign with <code>${tx.fromAddress}</code> on <b>Base</b> (chainId ${tx.chainId}). Route: <code>${tx.tool}</code>.</p>
 <button id="connect">1) Connect MetaMask</button>
-<button id="send" disabled>2) Send deposit</button>
+<button id="approve" disabled>2) Approve ${tx.amountUsdc} USDC</button>
+<button id="send" disabled>3) Send deposit</button>
 <pre id="out">not connected</pre>
 <script>
+const APPROVE = ${JSON.stringify({ to: tx.approveTo, data: tx.approveData })};
 const TX = ${JSON.stringify({ to: tx.to, data: tx.data, value: tx.valueHex })};
 const CHAIN_HEX = ${JSON.stringify(tx.chainIdHex)};
 const EXPECTED = ${JSON.stringify(tx.fromAddress.toLowerCase())};
 const out = (m) => document.getElementById("out").textContent = m;
 let account;
+const send = (t) => window.ethereum.request({ method: "eth_sendTransaction", params: [{ from: account, ...t }] });
 document.getElementById("connect").onclick = async () => {
   if (!window.ethereum) return out("MetaMask not found");
   const [a] = await window.ethereum.request({ method: "eth_requestAccounts" });
   account = a;
   if (a.toLowerCase() !== EXPECTED) { out("⚠️ connected " + a + " but expected " + EXPECTED); return; }
   try { await window.ethereum.request({ method: "wallet_switchEthereumChain", params: [{ chainId: CHAIN_HEX }] }); } catch (e) { out("switch chain failed: " + (e.message||e)); return; }
-  out("connected " + a + " on Base. Ready to send.");
-  document.getElementById("send").disabled = false;
+  out("connected " + a + " on Base.\\nStep 2: Approve USDC, then Step 3: Send.");
+  document.getElementById("approve").disabled = false;
+};
+document.getElementById("approve").onclick = async () => {
+  try { out("approving USDC..."); const h = await send({ to: APPROVE.to, data: APPROVE.data }); out("✅ approve sent: " + h + "\\nWait for it to confirm, then click Send deposit."); document.getElementById("send").disabled = false; }
+  catch (e) { out("❌ approve: " + (e.message||e)); }
 };
 document.getElementById("send").onclick = async () => {
-  try {
-    out("sending...");
-    const hash = await window.ethereum.request({ method: "eth_sendTransaction", params: [{ from: account, to: TX.to, data: TX.data, value: TX.value }] });
-    out("✅ sent: " + hash + "\\n\\nGive this hash to monitor the bridge:\\nMONITOR_TX=" + hash + " pnpm --filter @keel/lifi validate:deposit");
-  } catch (e) { out("❌ " + (e.message||e)); }
+  try { out("sending deposit..."); const h = await send({ to: TX.to, data: TX.data, value: TX.value }); out("✅ deposit sent: " + h + "\\n\\nMonitor the bridge:\\nMONITOR_TX=" + h + " pnpm --filter @keel/lifi validate:deposit"); }
+  catch (e) { out("❌ deposit: " + (e.message||e)); }
 };
 </script>
 </body></html>`;

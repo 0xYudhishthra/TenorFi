@@ -1,0 +1,34 @@
+{
+  "name": "@keel/api",
+  "version": "0.0.1",
+  "description": "Keel API — core hedge orchestration with HTTP + MCP skins over @keel/lifi and @keel/hyperliquid.",
+  "license": "MIT",
+  "type": "module",
+  "private": true,
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
+    "dev": "node --env-file=../../.env --import tsx --watch src/main.ts",
+    "start": "node --env-file=../../.env --import tsx src/main.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.7",
+    "@keel/hyperliquid": "workspace:*",
+    "@keel/lifi": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "better-sqlite3": "^11.7.0",
+    "drizzle-orm": "^0.38.2",
+    "hono": "^4.6.14",
+    "viem": "^2.52.2",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^25.9.3",
+    "drizzle-kit": "^0.30.1",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
+  }
+}

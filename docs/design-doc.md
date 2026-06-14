@@ -3,7 +3,7 @@
 
 > **Keel locks a fixed funding rate — rebuilt *natively on Aqua*, with collateral that never goes idle.** Perp funding swings wildly; Keel swaps your *variable* funding for a *fixed* one. The invisible cost that gutted Ethena, made fixed.
 
-**Status:** problem validated (real, famous, recent). ⚠️ **NOT a new category — funding-rate swaps already exist (Strips, Rho, IPOR).** Our claim is *execution*, not *first*: an **Aqua-native** swap with **live (in-wallet) collateral**, a **custom SwapVM settlement opcode**, and pure matching. EVM/Solidity, **a deterministic core an agent can *operate* but not *override*** — an MCP lets an agent drive the swap, but the brink decision is a human checkpoint (*agent proposes, user confirms* — see §5–§6). Bounties: **1inch Aqua · Chainlink CRE · LI.FI.** Funding is read from **Hyperliquid**; the swap is deployed on **Ethereum Sepolia**.
+**Status:** problem validated (real, famous, recent). ⚠️ **NOT a new category — funding-rate swaps already exist (Strips, Rho, IPOR).** Our claim is *execution*, not *first*: an **Aqua-native** swap with **live (in-wallet) collateral**, a **custom SwapVM settlement opcode**, and pure matching. EVM/Solidity, **a deterministic core an agent can *operate* but not *override*** — an MCP lets an agent drive the swap, but the brink decision is a human checkpoint (*agent proposes, user confirms* — see §5–§6). Bounties: **1inch Aqua · Chainlink CRE · LI.FI.** Funding is read from **Hyperliquid**; the swap is deployed on **Base Sepolia**.
 
 ---
 
@@ -98,7 +98,7 @@ This is the human-in-the-loop checkpoint: **the agent proposes, but the decision
 ## 6. Architecture (Aqua at the center)
 **The 3-layer stack:** **Chainlink CRE** (the funding-rate oracle) → **1inch Aqua / SwapVM** (custodies collateral as live virtual balances and nets fixed-vs-floating each period) → **LI.FI Composer** (one-click onboarding — bundles cross-chain USDC + a deposit into **both** legs of the hedge into a single Flow; detailed in the LI.FI section).
 
-**The full flow:** Chainlink CRE reads BTC's real funding rate from **Hyperliquid** each period → writes it on-chain as a **funding index** → the swap contract on **1inch Aqua** reads that index, computes fixed-vs-floating, and transfers the difference between the two parties → settlement and payout in **USDC**. **The swap is deployed on Ethereum Sepolia** (CRE and LI.FI support it, and we deploy our own Aqua + router there); **Hyperliquid is the funding-rate data source.**
+**The full flow:** Chainlink CRE reads BTC's real funding rate from **Hyperliquid** each period → writes it on-chain as a **funding index** → the swap contract on **1inch Aqua** reads that index, computes fixed-vs-floating, and transfers the difference between the two parties → settlement and payout in **USDC**. **The swap is deployed on Base Sepolia** (CRE and LI.FI support it, and we deploy our own Aqua + router there); **Hyperliquid is the funding-rate data source.**
 
 ```mermaid
 flowchart TB
@@ -106,7 +106,7 @@ flowchart TB
     LP["Keel LP (us / maker) — offers the fixed rate<br/>(speculators take this side in phase 2)"] --> KEEL
     CRE["Chainlink CRE<br/>Hyperliquid funding via API → DON → on-chain"] -->|funding index| KEEL
     LIFI["LI.FI Composer<br/>USDC collateral, cross-chain"] --> KEEL
-    KEEL["KEEL — funding-rate swap on 1inch Aqua / SwapVM (Ethereum Sepolia)<br/>custom _fundingSettle opcode (a derivative, not a trade) — BUILT + TESTED<br/>collateral stays alive via Aqua virtual balances; LP is the bounded counterparty"]
+    KEEL["KEEL — funding-rate swap on 1inch Aqua / SwapVM (Base Sepolia)<br/>custom _fundingSettle opcode (a derivative, not a trade) — BUILT + TESTED<br/>collateral stays alive via Aqua virtual balances; LP is the bounded counterparty"]
     KEEL -->|settle / payout in USDC| OUT["Hedger ↔ LP via Aqua virtual balances"]
     KEEL -.->|collateral-low| BRINK["USER CONFIRMS via MCP<br/>close / re-match / continue"]
 ```
@@ -125,7 +125,7 @@ flowchart TB
 
 > *Pitch:* "The hedge only works if both legs open together — **LI.FI Composer bundles the perp-leg deposit and the swap position into one click.** Without it, the user assembles the hedge by hand across two venues."
 
-**One line each:** **Aqua = the engine** (the table, collateral stays alive) · **CRE = the thermometer** (measures funding, puts it on-chain) · **LI.FI = the on-ramp** (one click brings collateral cross-chain into *both* legs). *Pull any one and the product breaks — but Aqua is the one we push furthest.* Settlement currency is **USDC on Ethereum Sepolia**.
+**One line each:** **Aqua = the engine** (the table, collateral stays alive) · **CRE = the thermometer** (measures funding, puts it on-chain) · **LI.FI = the on-ramp** (one click brings collateral cross-chain into *both* legs). *Pull any one and the product breaks — but Aqua is the one we push furthest.* Settlement currency is **USDC on Base Sepolia**.
 
 ### The agent layer (MCP) — the one-click front door (agent proposes, human disposes)
 The **Keel MCP** is how a user enters in one conversation. The agent orchestrates **both legs** of the hedge on the user's behalf; the user confirms with a single in-app signature.
@@ -172,7 +172,7 @@ flowchart TB
 ### Feasibility against the bounty stack (verified this session)
 - **1inch Aqua / SwapVM** — ✅ **BUILT + TESTED** (`packages/contracts/src/swapvm`). A custom `_fundingSettle` SwapVM instruction (`amountOut = clamp(R−F,±cap)×N`) registered in our own router (`KeelSwapVMRouter`); virtual balances keep collateral in-wallet. Unit-tested + an **e2e where a settlement executes through the opcode and moves real USDC via Aqua**, with a **double-settle guard** (per order+period), plus a deploy-wiring test — 32 tests in the single Foundry env. Live Sepolia deploy pending. Each period is one atomic, keeper/CRE-triggered swap; recurrence is external.
 - **Chainlink CRE** — verified (chainlink-cre-skill / docs): HTTP/Confidential-HTTP → DON consensus → on-chain write (KeystoneForwarder). Reading Hyperliquid funding via API and posting an index is squarely in scope. ✓
-- **Ethereum Sepolia** — the deploy target for the swap (Aqua, CRE, and LI.FI all support it; EIP-1153 transient storage is available, so the SwapVM opcode runs). Open items: confirm the **CRE KeystoneForwarder** address on Ethereum Sepolia (else EOA relayer fallback); test USDC (canonical vs `MockUSDC`, already in repo). **Hyperliquid** is the funding-rate data source (read via API by CRE), not a deploy target.
+- **Base Sepolia** — the deploy target for the swap (Aqua, CRE, and LI.FI all support it; EIP-1153 transient storage is available, so the SwapVM opcode runs). Open items: confirm the **CRE KeystoneForwarder** address on Base Sepolia (else EOA relayer fallback); test USDC (canonical vs `MockUSDC`, already in repo). **Hyperliquid** is the funding-rate data source (read via API by CRE), not a deploy target.
 - **LI.FI Composer** — one-click dual-leg onboarding: cross-chain USDC → deposit into Hyperliquid (HyperCore) **+** open the Keel swap in one Flow. The Hyperliquid deposit step is documented ("step into HyperCore in one step"); the Magnolia hackathon winner is precedent for the 1-click delta-neutral pattern. **TODO (integration lead):** confirm Composer can chain an **arbitrary contract call (`KeelSwap.open`) into the same Flow as the HL deposit** — if a single Flow can't bundle both, fall back to two sequenced calls behind one MCP confirmation. The perp order itself is fired via the **Hyperliquid API** by the MCP inside the flow (LI.FI deposits collateral; it does not place the order).
 
 ### The opcode + MVP scope
@@ -240,7 +240,7 @@ The three pieces are all load-bearing — no "bolted on?" risk: **CRE** brings t
 **The product UI around it:**
 1. **Funding-market panel** — live, jumpy **floating ticker** next to our **LP's offered fixed rate**; one **Lock fixed (Take)** button (the customer takes our standing offer).
 2. **One-click lock** — *"Locked 10% APR, 30 days, $50k notional"* → a live strip showing real funding moving while your rate is flat.
-3. **Hourly settlement, live** — each period the swap settles in **real USDC on Ethereum Sepolia**; show the cashflow + pre-locked collateral → **"no default possible," shown not asserted.** (Demo compresses ~2 min/period so a multi-week hedge fits the slot — documented, not faked.)
+3. **Hourly settlement, live** — each period the swap settles in **real USDC on Base Sepolia**; show the cashflow + pre-locked collateral → **"no default possible," shown not asserted.** (Demo compresses ~2 min/period so a multi-week hedge fits the slot — documented, not faked.)
 4. **The brink decision** — drive a side's collateral to the brink, then show Keel *pause* and surface the close / re-match / continue choice. The MCP agent prepares it; **the user confirms** the decision live. The agent proposes, the human decides — demonstrated, not asserted.
 
 **Real vs scripted:** the AMM quote, the lock, and the hourly USDC settlements are real (testnet); the crash **replay** uses real historical funding data on a slider so a 2-month event fits 60 seconds. Say so.
@@ -273,6 +273,6 @@ The three pieces are all load-bearing — no "bolted on?" risk: **CRE** brings t
 - **PMF caution:** the lending-rate generation died from weak PMF; Rho validates perp-funding demand *and* is the incumbent. This is an execution + integration play, not a greenfield market.
 - **Numbers:** $469T = *notional outstanding* (say "notional"); define/source the on-chain comparison figure precisely (don't get caught by Pendle being billions); the **funding cap + hourly interval are venue-specific** (state the venue, e.g. Hyperliquid hourly).
 - **Math decisions — LOCKED (resolved, see §6 *Settlement math*):** (1) **discrete per-period accumulator** (built; cumulative `cumIndex` is roadmap); (2) **annualized→per-period conversion off-chain** (contract only ever sees per-period `R`/`F`, signed `1e18`); (3) **`Δt` = real on-chain elapsed time** (`block.timestamp − last_settlement`, never a constant). Remaining to *verify* in `KeelSwap`: the **unit-consistency invariant** — `R`, `F`, `cap` must share the per-period `1e18` scale at the clamp site, or the clamp never bites.
-- **Ethereum Sepolia feasibility:** confirm the **CRE KeystoneForwarder** address on Ethereum Sepolia (else EOA relayer fallback); test USDC (canonical vs `MockUSDC`). EIP-1153 is available (post-Dencun), so the SwapVM opcode runs.
-- **First-3-hours validation gate (fail fast):** (1) can CRE fetch Hyperliquid BTC funding and write the index on-chain to the consumer on Ethereum Sepolia? → else EOA relayer fallback. (2) the custom SwapVM opcode → ✅ already built + tested (`packages/contracts/src/swapvm`). (3) can the contract read the index and transfer between two parties in one period? → ✅ proven (`KeelSwap` + opcode tests).
+- **Base Sepolia feasibility:** confirm the **CRE KeystoneForwarder** address on Base Sepolia (else EOA relayer fallback); test USDC (canonical vs `MockUSDC`). EIP-1153 is available (Cancun), so the SwapVM opcode runs.
+- **First-3-hours validation gate (fail fast):** (1) can CRE fetch Hyperliquid BTC funding and write the index on-chain to the consumer on Base Sepolia? → else EOA relayer fallback. (2) the custom SwapVM opcode → ✅ already built + tested (`packages/contracts/src/swapvm`). (3) can the contract read the index and transfer between two parties in one period? → ✅ proven (`KeelSwap` + opcode tests).
 - **Build long poles (start now):** the `_fundingSettle` opcode + the fixed-rate AMM curve; the CRE funding-oracle workflow; the hourly settlement + collateral/cap loop (✅ M1 settlement core done — 25 tests green).

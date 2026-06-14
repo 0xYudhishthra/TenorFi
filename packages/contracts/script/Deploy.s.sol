@@ -11,12 +11,12 @@ import {KeelSwapVMRouter} from "../src/swapvm/KeelSwapVMRouter.sol";
 import {KeelFundingProgram} from "../src/swapvm/KeelFundingProgram.sol";
 import {MockUSDC} from "../test/mocks/MockUSDC.sol";
 
-/// @title Deploy — Keel on Ethereum Sepolia
+/// @title Deploy — Keel on Base Sepolia
 /// @notice Deploys the full stack (Aqua + the custom SwapVM router + program + settlement core +
 ///         a demo USDC) and writes `deployments.json`. Run on a real testnet:
 ///
 ///   forge script script/Deploy.s.sol:Deploy \
-///     --rpc-url $SEPOLIA_RPC_URL --private-key $PRIVATE_KEY --broadcast
+///     --rpc-url $BASE_SEPOLIA_RPC_URL --private-key $PRIVATE_KEY --broadcast
 ///
 /// @dev `deploy()` is split out (no broadcast) so it can be exercised by a wiring test.
 contract Deploy is Script {

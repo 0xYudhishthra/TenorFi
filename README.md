@@ -53,7 +53,7 @@ flowchart TB
     LP["Keel LP / maker — quotes the fixed rate"] --> KEEL
     CRE["Chainlink CRE<br/>Hyperliquid funding → DON → on-chain"] -->|funding index| KEEL
     LIFI["LI.FI Composer<br/>USDC collateral, cross-chain"] --> KEEL
-    KEEL["KEEL swap — 1inch Aqua / SwapVM (Ethereum Sepolia)<br/>custom _fundingSettle opcode · collateral stays live via Aqua virtual balances"]
+    KEEL["KEEL swap — 1inch Aqua / SwapVM (Base Sepolia)<br/>custom _fundingSettle opcode · collateral stays live via Aqua virtual balances"]
     KEEL -->|settle / payout USDC| OUT["Hedger ↔ LP via Aqua virtual balances"]
     KEEL -.->|collateral-low| BRINK["User confirms via MCP<br/>close / re-match / continue"]
 ```
@@ -62,7 +62,7 @@ flowchart TB
 
 ```mermaid
 flowchart TB
-    A["Hyperliquid BTC funding (hourly — the public number)"] -->|"CRE: fetch → DON → KeystoneForwarder"| B["FundingIndex.setFundingIndex(period, R)<br/>on Ethereum Sepolia"]
+    A["Hyperliquid BTC funding (hourly — the public number)"] -->|"CRE: fetch → DON → KeystoneForwarder"| B["FundingIndex.setFundingIndex(period, R)<br/>on Base Sepolia"]
     B -->|"keeper fires settle() each period"| C["_fundingSettle opcode / KeelSwap<br/>net = clamp(R − F, ±cap) × N"]
     C --> D["USDC moves hedger ↔ LP via Aqua virtual balances<br/>(collateral never locked)"]
 ```
@@ -73,12 +73,12 @@ flowchart TB
 |-----------|--------|-------|
 | Settlement core (`KeelSwap` + `FundingIndex`) | **Built · 25 tests** | `packages/contracts/src` |
 | Custom SwapVM opcode (`_fundingSettle` + router + program) | **Built · unit + e2e** (settlement moves real USDC via Aqua) · double-settle guarded; Sepolia deploy pending | `packages/contracts/src/swapvm` |
-| Deploy script + wiring test (Ethereum Sepolia) | **Built · 1 test** | `packages/contracts/script` |
+| Deploy script + wiring test (Base Sepolia) | **Built · 1 test** | `packages/contracts/script` |
 | Chainlink CRE funding oracle | Planned (M2) | `packages/cre` |
 | LI.FI cross-chain onboarding | Planned | integration lead |
 | Keel MCP (agent front door) | Planned (M7) | `packages/mcp` |
 | Web app (lock UI + Ethena replay) | Planned (M5) | `apps/web` |
-| Ethereum Sepolia deployment | Pending | — |
+| Base Sepolia deployment | Pending | — |
 
 ## Repository layout
 
@@ -104,11 +104,11 @@ pnpm install          # @1inch/swap-vm + @1inch/aqua (needed to build the SwapVM
 forge test            # 30 tests
 ```
 
-Deploy to Ethereum Sepolia:
+Deploy to Base Sepolia:
 
 ```bash
 forge script script/Deploy.s.sol:Deploy \
-  --rpc-url $SEPOLIA_RPC_URL --private-key $PRIVATE_KEY --broadcast
+  --rpc-url $BASE_SEPOLIA_RPC_URL --private-key $PRIVATE_KEY --broadcast
 # writes deployments.json
 ```
 
@@ -120,7 +120,7 @@ forge script script/Deploy.s.sol:Deploy \
 | Aqua app | 1inch SwapVM custom instruction (Foundry) |
 | Funding oracle | Chainlink CRE (reads Hyperliquid funding) |
 | Cross-chain onboarding | LI.FI Composer |
-| Settlement currency / chain | USDC on Ethereum Sepolia |
+| Settlement currency / chain | USDC on Base Sepolia |
 | Agent front door | Keel MCP |
 
 ## Security & soundness

@@ -2,7 +2,7 @@
 
 > How each sponsor tech is integrated, in detail — with diagrams and code. **The test every
 > integration must pass:** *pull it out and the product breaks.*
-> **Target bounties: 1inch · Chainlink · LI.FI.** Deploy chain: **Ethereum Sepolia.** Funding data
+> **Target bounties: 1inch · Chainlink · LI.FI.** Deploy chain: **Base Sepolia.** Funding data
 > source: **Hyperliquid** (read by CRE).
 
 ## Summary
@@ -94,7 +94,7 @@ settle against.
 flowchart LR
     HL["Hyperliquid API<br/>BTC funding (hourly)"] -->|HTTP fetch| CRE["CRE workflow"]
     CRE -->|DON consensus| FWD["KeystoneForwarder"]
-    FWD -->|setFundingIndex period, R| IDX["FundingIndex (Ethereum Sepolia)"]
+    FWD -->|setFundingIndex period, R| IDX["FundingIndex (Base Sepolia)"]
     IDX --> K["KeelSwap.settle"]
     IDX --> O["_fundingSettle opcode"]
     IDX --> M["MCP get_funding"]
@@ -131,7 +131,7 @@ system — `KeelSwap`, the `_fundingSettle` opcode, and the MCP's `get_funding`.
 API (Hyperliquid) ✓ · a successful CRE CLI simulation qualifies (they deploy it live for you) — land
 **≥1 real on-chain write** ✓ · makes an on-chain state change (not a UI read) ✓.
 
-**Build steps (Axel).** (1) Ethereum Sepolia RPC + confirm KeystoneForwarder address; get the
+**Build steps (Axel).** (1) Base Sepolia RPC + confirm KeystoneForwarder address; get the
 deployed `FundingIndex` from `deployments.json`. (2) Write the workflow: HTTP fetch HL BTC funding →
 DON consensus → convert annualized→per-period → `setFundingIndex`. (3) Simulate via CRE CLI. (4) Land
 one real on-chain write; hand the tx hash to the submission.
@@ -150,7 +150,7 @@ leg and (b) opens the Keel swap (`KeelSwap.open`). The MCP uses Composer as its 
 
 ```mermaid
 flowchart TB
-    USER["USDC on any chain"] -->|LI.FI Composer Flow| BRIDGE["bridge to Ethereum Sepolia / HyperCore"]
+    USER["USDC on any chain"] -->|LI.FI Composer Flow| BRIDGE["bridge to Base Sepolia / HyperCore"]
     BRIDGE --> DEP["deposit collateral → Hyperliquid (perp leg)"]
     BRIDGE --> OPEN["KeelSwap.open (hedge leg)"]
 ```

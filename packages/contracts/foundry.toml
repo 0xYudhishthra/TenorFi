@@ -8,8 +8,8 @@ solc = "0.8.30"
 optimizer = true
 optimizer_runs = 200
 via_ir = true
-# Cancun gives us EIP-1153 transient storage (the SwapVM reentrancy lock). Ethereum Sepolia
-# supports it (post-Dencun).
+# Cancun gives us EIP-1153 transient storage (the SwapVM reentrancy lock). Base Sepolia
+# supports it (Cancun).
 evm_version = "cancun"
 fs_permissions = [{ access = "read-write", path = "./" }]
 remappings = [

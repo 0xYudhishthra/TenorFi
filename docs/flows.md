@@ -1,24 +1,32 @@
-# Keel — Flows & Interactions
+# TenorFi — Flows & Interactions
 
-> The canonical, end-to-end description of how Keel works: who the actors are, what a user does, and
+> The canonical, end-to-end description of how TenorFi works: who the actors are, what a user does, and
 > what the system does each period. **This is the single source of truth for "how it works."** The
 > [`design-doc.md`](design-doc.md) holds the deeper economic/risk analysis; [`bounty-integrations.md`](bounty-integrations.md)
 > holds the per-sponsor code.
 >
 > **Chain:** Base mainnet (chain id 8453) — real funds/gas; keep demo position sizes small.
-> **Funding source:** Hyperliquid (read by Chainlink, never touched by the Keel contract).
+> **Funding source:** Hyperliquid (the funding rate is read on-chain by Chainlink CRE).
+
+> ⚠️ **Design direction (current).** This describes the **subscription / just-in-time-premium** model:
+> the user posts **no collateral**, 1inch Aqua pulls a **fixed premium** from their wallet each hour, and
+> TenorFi **covers their actual funding** on Hyperliquid. The **deployed** Base contracts still implement the
+> *prior* model — **net** `(R − F)` settlement from **pre-shipped Aqua virtual balances** — so the
+> on-chain code is mid-migration. Don't present the subscription model as fully live on-chain until the
+> contracts ship. (Synced with the team — see §B.0 for what's actually deployed today.)
 
 ---
 
 ## The one-sentence model
 
-**Keel is insurance on your funding rate.** You hold a perp on Hyperliquid and pay a *variable* funding
-fee every hour; Keel sells you a policy that pins that cost to a *fixed* rate. If real funding spikes, the
-protocol pays you the difference (and tops your margin back up); if it stays calm, you pay the premium.
-Your net funding cost stays flat.
+**TenorFi is a subscription that fixes your funding rate.** You hold a perp on Hyperliquid and owe a
+*variable* funding fee every hour. **TenorFi covers that fee for you** — and in exchange you pay a **fixed
+premium** (e.g. 7.3% APR → the per-hour amount). The premium is pulled straight from your wallet by **1inch
+Aqua, just-in-time** (the hour before each funding payment), so **you lock up no collateral**. Your net
+funding cost is the fixed rate, flat.
 
-The protocol is the **insurer**: it pays you from a **pre-funded, capped reserve** and earns the premium
-when funding is calm. The reserve's exposure is capped per period and pre-funded up front, so it can
+The protocol is the **insurer**: it covers your funding from a **pre-funded, capped reserve** and keeps the
+premium when funding is calm. The reserve's exposure is capped per period and pre-funded up front, so it can
 always pay — **no default, by design** (see below). *(In the MVP, we run that reserve; in a mature market,
 speculators provide it.)*
 
@@ -28,25 +36,25 @@ speculators provide it.)*
 
 | Actor / component | Role |
 |---|---|
-| **User + their agent** (Claude Code / Codex / any MCP client) | The **hedger** — a leveraged perp long who wants their funding cost fixed. Speaks in natural language; the agent acts through the Keel MCP. |
-| **Keel MCP** | The front door. Reads funding, lists offers, builds the transactions. *Proposes; the human confirms.* |
-| **LI.FI Composer** | The on-ramp. Brings the user's USDC cross-chain and opens **both legs** of the hedge in one Flow. |
+| **User + their agent** (Claude Code / Codex / any MCP client) | The **hedger** — a leveraged perp long who wants their funding cost fixed. Speaks in natural language; the agent acts through the TenorFi MCP. |
+| **TenorFi MCP** | The front door. Reads funding, lists offers, builds the transactions, routes the funding coverage to the user's HL margin. *Proposes; the human confirms.* |
+| **LI.FI Composer** | The on-ramp. Brings the user's USDC cross-chain to fund the **Hyperliquid perp** and authorize the **TenorFi subscription** in one Flow. |
 | **Hyperliquid** | Where the real perp lives (leg 1). Also the **funding-rate data source** (read by Chainlink). |
-| **Keel contracts** (Base mainnet) | The insurance policy (leg 2): the `_fundingSettle` Aqua opcode (`KeelSwapVMRouter` + `KeelFundingProgram`). Matching + settlement only — no custody (collateral stays in-wallet as Aqua virtual balances). |
-| **1inch Aqua / SwapVM** | The settlement engine. The collateral lives as **virtual balances**, so it keeps earning yield while it backs the policy. |
-| **Chainlink CRE** | The thermometer. Reads Hyperliquid funding → DON consensus → writes it on-chain. |
-| **Insurance reserve** | The protocol's pre-funded counterparty that pays claims and collects premiums. In the MVP, a **pre-funded team wallet**. |
-| **Keeper** | Fires `settle()` once per period. |
+| **TenorFi contracts** (Base mainnet) | The subscription engine (leg 2): the `_fundingSettle` Aqua opcode (`KeelSwapVMRouter` + `KeelFundingProgram`). Pulls the fixed premium from the user's wallet via Aqua each period — **no custody, no user-posted collateral**. |
+| **1inch Aqua / SwapVM** | The settlement engine. **Pulls the fixed premium directly from the user's wallet, just-in-time each period — the user locks up nothing.** |
+| **Chainlink CRE** | The thermometer. Reads Hyperliquid funding → DON consensus → writes it on-chain — the **actual funding TenorFi must cover**. |
+| **Insurance reserve** | The protocol's pre-funded counterparty that **covers the user's funding** and collects the premium. In the MVP, a **pre-funded team wallet**. |
+| **Keeper** | Fires `settle()` once per period (pull the premium + cover the funding). |
 
-**The key separation (read this — it's what everyone gets confused on):** the Keel contract **never
-touches your Hyperliquid position.** It settles against a *public number* — the funding rate — like rain
-insurance pays on rainfall without controlling the weather. That's why we don't need to build a perp DEX.
-The **MCP** is the convenience layer that drives your own Hyperliquid leg via API and mirrors payouts to
-it; the **contract** only reads the number and settles.
+**The core idea (what makes it different):** **you lock up no collateral.** Strips/IPOR make you post
+margin that sits dead for weeks; TenorFi pulls a small **fixed premium** from your wallet each hour — pay as
+you go — and **covers your actual funding** in return. TenorFi reads the funding rate on-chain via Chainlink to
+know exactly what to cover; the MCP routes the coverage to your Hyperliquid margin so your net cost stays
+pinned at the fixed rate.
 
 **Two rates (used everywhere below):**
 - **AFR — Actual Funding Rate**: what the market actually charged this period (realized, from Chainlink).
-- **FFR — Fixed Funding Rate**: the rate you locked.
+- **FFR — Fixed Funding Rate**: the rate you locked (your fixed premium).
 
 ---
 
@@ -55,32 +63,30 @@ it; the **contract** only reads the number and settles.
 **1 — Ask, in one conversation.**
 > *User → agent:* "Open a $5,000 BTC long on Hyperliquid and fix my funding rate."
 
-**2 — Pick a policy.** The MCP lists the insurer's standing offers, each a `{fixed rate, max coverage}`:
-- 5% fixed · $25k max coverage
-- 10% fixed · $50k max coverage
-- 15% fixed · $100k max coverage
+**2 — Quote.** The MCP returns a single quote, a `{fixed rate, coverage}`. **The fixed rate is 7.3% APR** — the fair/break-even rate from a year of real BTC funding. **Coverage auto-scales to ≈ 1.5% of the position** — for this $5,000 long that's ~**$75**, pre-funded by the reserve.
 
-*(Max coverage = the ceiling the insurance can pay out = `cap × notional`.)*
+*(**Coverage = the reserve's pre-locked collateral** = its cumulative payout budget over the swap's life, ≈ 1.5% of notional — **not** `cap × notional` (that is only the per-period clamp). One fixed rate for everyone; coverage is set by the position size. The 7.3% rate, the cap and the 1.5% sizing are all validated against a year of real BTC funding — `docs/research/analysis.md`. The user posts none of the coverage.)*
 
-**3 — Choose + sign once.**
-> *User:* "The 5% one." → *MCP:* "Done — sign once." → **one signature.**
+**3 — Confirm + sign once.**
+> *User:* "Do it." → *MCP:* "Done — sign once." → **one signature** (opens the perp + authorizes the
+> Aqua premium pulls).
 
-**4 — Position live.** Both legs are open. The user's collateral is locked as the insurance premium pool
-and **lives in Aqua, earning yield** while it backs the policy. A minimal panel shows: the Hyperliquid
-position, the Keel position, the collateral in Aqua, **FFR = 5%**, and **AFR live**.
+**4 — Position live.** The perp is open and the TenorFi subscription is active. **No collateral is locked** —
+the user simply authorized Aqua to pull the fixed premium each period. A minimal panel shows: the
+Hyperliquid position, **FFR = 7.3%**, **AFR live**, and the next premium due.
 
-**5 — The per-period loop (the policy at work).** Each period (hourly; compressed in the demo):
-- **AFR > FFR** — funding spiked and is draining your perp margin → **the protocol pays you** the
-  difference in USDC, routed to top up your Hyperliquid margin. *The claim payout.*
-- **AFR < FFR** — funding is below your locked rate → **you pay the premium** from your collateral into
-  the protocol's reserve. *The cost of certainty.*
+**5 — The per-period loop (the subscription at work).** Each period (hourly; compressed in the demo):
+- **Aqua pulls the fixed premium** (`FFR × notional`) straight from the user's wallet — just-in-time, the
+  hour before funding is due.
+- **TenorFi covers the user's actual funding** (`AFR × notional`), routed to top up their Hyperliquid margin.
 
-Either way, your **net funding cost stays pinned at 5%.**
+So whether **AFR > FFR** (funding spiked — the reserve eats the gap) or **AFR < FFR** (funding calm — the
+reserve keeps the spread), the user's **net funding cost stays pinned at 7.3%.**
 
-**6 — The end.** The loop runs until you close, or until the **brink** — your collateral can no longer
-cover one more worst-case period (`remaining < cap × notional`). Keel does **not** close blindly: the
-agent **proposes** three options — **close · re-match · top up (continue)** — and **you confirm** with a
-signature. *Agent proposes, the human decides.*
+**6 — The end.** The subscription runs until you close, or until the **brink** — your wallet can't fund the
+next premium pull. TenorFi does **not** close blindly: the agent **proposes** three options — **close ·
+re-match · top up your wallet (continue)** — and **you confirm** with a signature. *Agent proposes, the
+human decides.*
 
 ---
 
@@ -101,23 +107,25 @@ The intersection between the CRE write path and the Aqua read path is a **single
 | Aqua settlement layer (router + program + position token) | deploys with the rest of the stack in one shot via `script/Deploy.s.sol` |
 
 The CRE write path is **live and verified on-chain** (real Hyperliquid funding written into `FundingIndex`).
-What remains is deploying the Aqua settlement layer and wiring open/ship + a keeper (see §D).
+What remains is wiring the subscription premium-pull + funding-coverage settlement and a keeper (see §D).
+*(The deployed opcode currently settles the **net** `(R − F)` from pre-shipped balances; the premium-pull /
+coverage split below is the migration — see the banner at the top.)*
 
 ### B.1 — Onboarding (one user signature)
 
 ```mermaid
 flowchart TB
-    AGENT["User + agent → Keel MCP<br/>'long BTC $5k + fix funding' → pick 5% offer → sign once"] --> FLOW["LI.FI Composer Flow<br/>(cross-chain USDC, one signature)"]
-    FLOW --> HL["Deposit collateral → Hyperliquid (HyperCore)<br/>MCP fires the perp order via HL API"]
-    FLOW --> KEEL["Open the Keel policy<br/>ship both legs into Aqua"]
-    KEEL --> AQUA["Collateral held as Aqua virtual balances<br/>→ keeps earning yield while it insures"]
+    AGENT["User + agent → TenorFi MCP<br/>'long BTC $5k + fix funding' → pick 5% offer → sign once"] --> FLOW["LI.FI Composer Flow<br/>(cross-chain USDC, one signature)"]
+    FLOW --> HL["Fund the Hyperliquid perp (HyperCore)<br/>MCP fires the perp order via HL API"]
+    FLOW --> TENORFI["Activate the TenorFi subscription<br/>authorize Aqua to pull the fixed premium"]
+    TENORFI --> WALLET["No collateral locked<br/>→ premium pulled from the wallet, just-in-time, each period"]
 ```
 
-*Both legs are funded with **real USDC**: LI.FI bridges the user's USDC cross-chain and **deposits** into
-both — the Hyperliquid perp margin **and** the Keel leg (shipped into Aqua). The perp order itself is fired
-by the MCP via the Hyperliquid API in the same flow — LI.FI does not place the order. Because settlement is
-real USDC, the `AFR > FFR` payout can **literally** top up the HL margin (no token mismatch).*
-*Open item (integration lead): confirm the Composer Flow can chain the Aqua `ship` call after the bridge in
+*LI.FI bridges the user's USDC cross-chain to **fund the Hyperliquid perp margin** and the user **authorizes
+the Aqua premium pulls** — the perp order itself is fired by the MCP via the Hyperliquid API in the same
+flow (LI.FI does not place the order). The user **deposits no collateral into TenorFi**; the premium is pulled
+from their wallet only when due.*
+*Open item (integration lead): confirm the Composer Flow can chain the Aqua authorization after the bridge in
 one Flow; else two sequenced calls behind one MCP confirmation.*
 
 ### B.2 — The oracle (each period)
@@ -146,42 +154,38 @@ flowchart LR
 
 ```mermaid
 flowchart TB
-    KEEPER["keeper → settle(period)"] --> READ["read R from FundingIndex<br/>(revert if not set)"]
-    READ --> NET["net = clamp(R − F, ±cap) × notional"]
-    NET --> DIR{"direction"}
-    DIR -->|"AFR > FFR"| PAY["insurer pays hedger (USDC)<br/>→ top up HL margin"]
-    DIR -->|"AFR < FFR"| PREM["hedger pays premium → reserve"]
-    PAY --> MARK["mark (order/swap, period) settled<br/>→ no double-settle"]
-    PREM --> MARK
+    KEEPER["keeper → settle(period)"] --> READ["read R (AFR) from FundingIndex<br/>(revert if not set)"]
+    READ --> PULL["Aqua pulls fixed premium<br/>FFR × notional ← user wallet"]
+    READ --> COVER["reserve covers actual funding<br/>AFR × notional → user HL margin (capped)"]
+    PULL --> MARK["mark (order, period) settled<br/>→ no double-settle"]
+    COVER --> MARK
 ```
 
-The settlement amount is `net = clamp(realized − fixed, ±cap) × notional`:
-- `R > F` → the insurer pays the hedger;
-- `R < F` → the hedger pays the premium;
-- `R = F` → nothing moves.
+Each period, two flows make the user's cost fixed:
+- **Premium in:** Aqua pulls `FFR × notional` from the user's wallet → the reserve.
+- **Funding covered:** the reserve sends `AFR × notional` (capped at `cap × notional`) → the user's HL margin.
 
-**On the Aqua opcode path** (`_fundingSettle`), settlement is **directional** and **bound to the agreed
-counterparty**: because SwapVM is one-directional (maker → taker), a Keel policy is implemented as **two
-mirror orders** — one pays when `realized > fixed` (`makerPaysAbove = true`), the other when `realized <
-fixed`. Each order pays `0` outside its own direction, so no side is ever debited the wrong way, and each
-order reverts (`UnauthorizedTaker`) if anyone but the agreed counterparty tries to take it.
+The reserve's per-period P&L is `(FFR − AFR) × notional`: it keeps the spread when funding is calm and eats
+the gap when funding spikes (bounded by the cap). The user's net is always the fixed rate.
 
-**Tokens at settlement:** the swap's `tokenOut` is **canonical Base USDC** `0x8335…2913` (real USDC — the
-token the Base-mainnet fork test moves); `tokenIn` is a non-USDC **position-marker** ERC20 (amountIn 0, so
-SwapVM's `tokenIn != tokenOut` invariant holds). Collateral is shipped into Aqua as a **virtual balance**
-and only the netted USDC is pulled/pushed at settlement, so it stays in-wallet until the moment it moves.
-*(An early `MockUSDC 0x3A51…c6e8` was deployed but is superseded — settlement is real USDC.)*
+> **On-chain today (divergence):** the deployed `_fundingSettle` opcode settles the **net** difference
+> `clamp(R − F, ±cap) × notional` from **pre-shipped Aqua virtual balances** (two mirror orders,
+> directional, `UnauthorizedTaker`-bound, double-settle guarded) — it does **not** yet split the
+> premium-pull from the coverage, and the user still ships a balance. Economically the net is the same; the
+> subscription split (zero user collateral, premium pulled just-in-time) is the migration. See
+> [`bounty-integrations.md`](bounty-integrations.md) for the deployed opcode.
 
 ### No default, by design
 
-1. **Capped per period** — the most that can move in one period is `cap × notional` (the venue funding
+1. **Capped per period** — the most the reserve covers in one period is `cap × notional` (the venue funding
    clamp), so the worst case is bounded.
-2. **Pre-funded** — each side locks at least that worst case up front, so the first period is always
-   covered and settlement can never overdraw a balance (it reverts instead of creating unbacked debt).
-3. **Conserved** — settlement only *moves* collateral between the two sides; the total is never created.
-   A credited party is always backed by tokens the contract actually holds.
+2. **Reserve pre-funded** — the reserve holds at least that worst case up front, so coverage can never
+   overdraw (a payout that would exceed the reserve reverts instead of creating unbacked debt).
+3. **The user holds nothing to lose** — if their wallet can't fund the next premium pull, the position
+   simply **closes**; there is no user collateral to drain. The user's only obligation is to have the small
+   fixed premium in their wallet at each pull.
 
-So if one side is ever drained, **only that side closes — the other is paid in full.**
+So default risk lives only on the insurer's side, and it's bounded + pre-funded.
 
 ---
 
@@ -190,9 +194,10 @@ So if one side is ever drained, **only that side closes — the other is paid in
 - **Read:** `get_funding(market)` (AFR via Chainlink), `list_offers()` (the insurer's fixed-rate offers),
   `get_position(addr)`, `preview_settle(swapId, realized)`.
 - **Open (user-signed):** `open_hyperliquid_position(market, side, size)` (HL API) +
-  `open_keel_position(offerId)` (approve Aqua + `ship` the leg via `KeelFundingProgram`/`KeelSwapVMRouter`).
-- **Settle (routine, keeper/agent):** the bound taker calls `KeelSwapVMRouter.swap` over the shipped
-  order for the period → on `AFR > FFR`, `topup_hyperliquid_margin(...)`.
+  `open_keel_position(offerId)` (authorize Aqua to pull the premium via `KeelFundingProgram`/`KeelSwapVMRouter`
+  — no collateral deposit).
+- **Settle (routine, keeper/agent):** the bound taker calls `KeelSwapVMRouter.swap` over the order for the
+  period (Aqua pulls the premium); the reserve covers the funding → `topup_hyperliquid_margin(...)`.
 - **Gated (brink, user-confirmed):** `propose_decision(swapId)` → returns the *unsigned* close / top-up /
   re-match tx for the user to confirm.
 
@@ -206,14 +211,14 @@ cashflow deterministically, and at the brink the **human confirms**.
 | Capability | Status |
 |---|---|
 | MCP conversation → 3 offers → one signature | **Demo** |
-| LI.FI Composer opens both legs; collateral earns in Aqua | **Demo** |
-| **One real settlement tick** (AFR > FFR → protocol pays real USDC) on Base mainnet | **Demo** |
+| LI.FI Composer funds the perp + activates the subscription (no user collateral) | **Demo** |
+| **One real settlement tick** (Aqua pulls the premium; reserve covers funding) on Base mainnet | **Demo** |
 | The full per-period loop running hour after hour | Roadmap (narrated) |
 | The **brink** decision (agent proposes → human confirms) | Roadmap (narrated) |
+| Subscription split deployed on-chain (premium-pull vs net) | Roadmap (migration — see banner) |
 | Speculators replacing the team-run reserve | Phase 2 |
-| Cumulative funding index (lazy/range settlement) | Roadmap |
 
-**Real vs scripted (say it on stage):** the swap, the collateral in Aqua, the settlement, and the USDC
-movement are **real** (Base mainnet). The realized funding value (`AFR`) in the demo is **injected** —
-it's exactly what Chainlink CRE posts from Hyperliquid, scripted high to show the `AFR > FFR` payout. The
-Ethena / Oct-10 figures are **real historical data**.
+**Real vs scripted (say it on stage):** the swap, the premium pull, the settlement, and the USDC movement
+are **real** (Base mainnet). The realized funding value (`AFR`) in the demo is **injected** — it's exactly
+what Chainlink CRE posts from Hyperliquid, scripted to show the coverage. The Ethena / Oct-10 figures are
+**real historical data**.

@@ -1,6 +1,6 @@
-# Keel
+# TenorFi
 
-> On-chain fixed-funding-rate swaps — built natively on 1inch Aqua, with collateral that never goes idle. Swap your *variable* perp funding for a *fixed* one, in one click.
+> **The interest-rate swap for perps.** On-chain fixed-funding-rate swaps — built natively on 1inch Aqua, with collateral that never goes idle. Turn your *variable* perp funding into a *fixed* rate in one click — the unhedgeable cost that keeps institutions out of perps, made fixed.
 
 - **Design doc** (source of truth): [`docs/design-doc.md`](docs/design-doc.md)
 - **Bounty integrations** (1inch · Chainlink · LI.FI — diagrams + code): [`docs/bounty-integrations.md`](docs/bounty-integrations.md)
@@ -11,11 +11,13 @@
 
 ## The problem
 
-Perpetual-futures *funding* is the floating fee traders pay or earn every hour. It swings violently and nobody can lock it in — the variable cost that gutted Ethena (~$16.6B → ~$5.6B as its funding yield collapsed). TradFi solved this 40 years ago with the interest-rate swap (~$469T notional). Crypto built $60T+/yr of this risk; the safety net is still nascent.
+Perpetual-futures *funding* is the floating fee traders pay or earn every hour. It swings violently and nobody can lock it in — the variable cost that gutted Ethena (~$16.6B → ~$5.6B as its funding yield collapsed). **It's also why institutions can't enter perps:** an open-ended variable cost is uninvestable — no risk desk holds a carry that can spike 10× in a day and can't be hedged.
+
+TradFi ran this exact movie in 1981: savings institutions earned fixed and paid variable; when Volcker took rates to ~20%, the variable cost outran the fixed yield and **over a thousand of them failed.** The fix was the **fixed-for-floating interest-rate swap** — and once the risk was hedgeable it became *investable for institutions*, now **~$469T notional**, the largest market on earth. **Oct 10, 2025 (~$19B liquidated) is the Volcker shock of perps.** Crypto built $60T+/yr of this risk; the safety net is still nascent.
 
 ## The solution
 
-Keel is a funding-rate swap: **variable → fixed**. It never touches your Hyperliquid position — it settles against a *public number* (the funding rate, read by Chainlink CRE), like rain insurance pays on rainfall without controlling the weather.
+TenorFi is **the interest-rate swap for perps: variable → fixed**. It never touches your Hyperliquid position — it settles against a *public number* (the funding rate, read by Chainlink CRE), like rain insurance pays on rainfall without controlling the weather. Turn the one cost a risk desk can't hold into a fixed line item, and a $60T+ market opens to institutional capital.
 
 - **Hedger (the customer / taker)** — a leveraged perp long. Pays fixed, receives floating → their variable funding is cancelled, leaving a flat locked rate. Takes our offer in one click.
 - **Insurance reserve (us / maker)** — quotes a consistent fixed rate and stands as the counterparty, so a hedger locks instantly. Receives fixed, pays floating; earns the premium when funding stays calm, pays out (bounded per period) when it spikes.
@@ -35,7 +37,7 @@ net = clamp(realized − fixed, ±cap) × notional       (credit to the hedger)
 
 ## The brink decision
 
-When a side's collateral can no longer cover one more worst-case period (`remaining < cap × notional`), Keel does not close blindly. The MCP agent prepares the choice — **close · re-match · continue (top up)** — and the user confirms it. *Agent proposes, user confirms:* the decision that moves money at the brink is made by a person.
+When a side's collateral can no longer cover one more worst-case period (`remaining < cap × notional`), TenorFi does not close blindly. The MCP agent prepares the choice — **close · re-match · continue (top up)** — and the user confirms it. *Agent proposes, user confirms:* the decision that moves money at the brink is made by a person.
 
 ## Integrations
 
@@ -50,13 +52,13 @@ When a side's collateral can no longer cover one more worst-case period (`remain
 
 ```mermaid
 flowchart TB
-    HEDGER["Hedger / taker"] -->|takes our rate| KEEL
-    RESERVE["Insurance reserve / maker — quotes the fixed rate"] --> KEEL
-    CRE["Chainlink CRE<br/>Hyperliquid funding → DON → KeystoneForwarder → KeelFundingReceiver.onReport"] -->|funding index| KEEL
-    LIFI["LI.FI Composer<br/>USDC collateral, cross-chain"] --> KEEL
-    KEEL["KEEL swap — 1inch Aqua / SwapVM (Base mainnet)<br/>custom _fundingSettle opcode · collateral stays live via Aqua virtual balances"]
-    KEEL -->|settle / payout USDC| OUT["Hedger ↔ reserve via Aqua virtual balances"]
-    KEEL -.->|collateral-low| BRINK["User confirms via MCP<br/>close / re-match / continue"]
+    HEDGER["Hedger / taker"] -->|takes our rate| TENORFI
+    RESERVE["Insurance reserve / maker — quotes the fixed rate"] --> TENORFI
+    CRE["Chainlink CRE<br/>Hyperliquid funding → DON → KeystoneForwarder → KeelFundingReceiver.onReport"] -->|funding index| TENORFI
+    LIFI["LI.FI Composer<br/>USDC collateral, cross-chain"] --> TENORFI
+    TENORFI["TENORFI swap — 1inch Aqua / SwapVM (Base mainnet)<br/>custom _fundingSettle opcode · collateral stays live via Aqua virtual balances"]
+    TENORFI -->|settle / payout USDC| OUT["Hedger ↔ reserve via Aqua virtual balances"]
+    TENORFI -.->|collateral-low| BRINK["User confirms via MCP<br/>close / re-match / continue"]
 ```
 
 ## The settlement loop
@@ -78,7 +80,7 @@ flowchart TB
 | Deploy script + wiring test (Base mainnet) | **Built · 1 test** | `packages/contracts/script` |
 | Chainlink CRE funding oracle (Hyperliquid → DON → on-chain) | **Built · live write verified on Base mainnet** | `packages/cre/keel-funding` |
 | LI.FI cross-chain onboarding | Planned | integration lead |
-| Keel MCP (agent front door) | Planned (M7) | `packages/mcp` |
+| TenorFi MCP (agent front door) | Planned (M7) | `packages/mcp` |
 | Web app (lock UI + Ethena replay) | Planned (M5) | `apps/web` |
 | Base mainnet deployment (funding stack) | **Live** — see below | `packages/contracts/deployments.json` |
 
@@ -104,7 +106,7 @@ keel/
 │   ├── contracts/        # Foundry (single env) — funding latch + CRE receiver (src/) + SwapVM settlement opcode (src/swapvm/) + deploy (script/)
 │   ├── cre/              # Chainlink CRE workflow (TypeScript/bun): Hyperliquid funding → DON → on-chain index
 │   ├── keeper/           # per-period settle() trigger
-│   └── mcp/              # Keel MCP: read funding + operate the swap; brink → user confirm
+│   └── mcp/              # TenorFi MCP: read funding + operate the swap; brink → user confirm
 └── apps/
     └── web/              # lock UI + the Ethena replay demo
 ```
@@ -138,7 +140,7 @@ forge script script/Deploy.s.sol:Deploy \
 | Funding oracle | Chainlink CRE (reads Hyperliquid funding) |
 | Cross-chain onboarding | LI.FI Composer |
 | Settlement currency / chain | USDC on Base mainnet |
-| Agent front door | Keel MCP |
+| Agent front door | TenorFi MCP |
 
 ## Security & soundness
 
@@ -149,7 +151,7 @@ forge script script/Deploy.s.sol:Deploy \
 
 ## Team
 
-Keel — ETHGlobal New York 2026.
+TenorFi — ETHGlobal New York 2026.
 
 ## License
 

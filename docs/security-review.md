@@ -1,4 +1,4 @@
-# Keel — Security Review (internal)
+# TenorFi — Security Review (internal)
 
 Scope: `FundingIndex`, `KeelFundingReceiver`, and the SwapVM settlement pieces
 (`FundingSettle` opcode, `KeelOpcodes`, `KeelSwapVMRouter`, `KeelFundingProgram`).
@@ -54,7 +54,7 @@ happy-path fork test missed. All actionable findings are now fixed; tests added 
 | # | Sev | Finding | Resolution |
 |---|---|---|---|
 | A | High | **Any address could take the settlement order and steal the reserve's payout** (order not bound to the counterparty) | **Fixed** — `_fundingSettle` binds the order to a `counterparty` and reverts `UnauthorizedTaker` if `ctx.query.taker != counterparty`. Test: `test_strangerCannotTake`. |
-| B | High | **Opcode dropped the sign of `R − F`** → maker paid in both directions / drainable | **Fixed** — settlement is now directional: each leg has `makerPaysAbove`; an order pays only in its own direction (0 otherwise). A Keel position is two mirror orders. Tests: `test_wrongDirection_paysZero`, `test_makerPaysBelow_RBelowF_pays`. |
+| B | High | **Opcode dropped the sign of `R − F`** → maker paid in both directions / drainable | **Fixed** — settlement is now directional: each leg has `makerPaysAbove`; an order pays only in its own direction (0 otherwise). A TenorFi position is two mirror orders. Tests: `test_wrongDirection_paysZero`, `test_makerPaysBelow_RBelowF_pays`. |
 | 1 | Med-High | **USDC blacklisting locks all collateral in `KeelSwap.close()`** | **Resolved by removal** — `KeelSwap` deleted; the Aqua path never custodies collateral (virtual balances stay in the owner's wallet), so there is no pooled `close()` to block. |
 | 4 | Med | **Early `KeelSwap.close()` skips unsettled periods** | **Resolved by removal** — `KeelSwap` deleted. On the Aqua path each period is an independent shipped-order settlement; closing = stop shipping / withdraw the remaining virtual balance. |
 | 5 | Med | **`KeelSwap.open()` pulls counterparty's full approval into unagreed terms** | **Resolved by removal** — `KeelSwap` deleted. On the Aqua path each side `ship`s its own strategy (per-swap consent) and the order is taker-bound, so there is no counterparty-allowance pull. |

@@ -1,9 +1,15 @@
-# Keel — Bounty Integrations
+# TenorFi — Bounty Integrations
 
 > How each sponsor tech is integrated, in detail — with diagrams and code. **The test every
 > integration must pass:** *pull it out and the product breaks.*
 > **Target bounties: 1inch · Chainlink · LI.FI.** Deploy chain: **Base mainnet.** Funding data
 > source: **Hyperliquid** (read by CRE).
+>
+> ⚠️ **Design direction:** TenorFi is moving to a **subscription** model — the user posts **no collateral**;
+> 1inch Aqua pulls a **fixed premium** from their wallet just-in-time each period, and the reserve covers
+> their actual funding (see [`flows.md`](flows.md)). The **deployed** opcode shown below still settles the
+> **net** `(R − F)` from **pre-shipped Aqua balances** — economically identical per period; the
+> premium-pull split is the migration. The code in this doc reflects what's **live**.
 
 ## Summary
 
@@ -15,10 +21,10 @@
 
 ```mermaid
 flowchart LR
-    LIFI["LI.FI Composer<br/>cross-chain USDC in"] --> KEEL
-    CRE["Chainlink CRE<br/>Hyperliquid funding → KeystoneForwarder → KeelFundingReceiver.onReport → on-chain"] -->|funding index| KEEL
-    KEEL["1inch Aqua / SwapVM<br/>_fundingSettle opcode settles each period"]
-    KEEL -->|USDC| OUT["hedger ↔ reserve"]
+    LIFI["LI.FI Composer<br/>cross-chain USDC in"] --> TENORFI
+    CRE["Chainlink CRE<br/>Hyperliquid funding → KeystoneForwarder → KeelFundingReceiver.onReport → on-chain"] -->|funding index| TENORFI
+    TENORFI["1inch Aqua / SwapVM<br/>_fundingSettle opcode settles each period"]
+    TENORFI -->|USDC| OUT["hedger ↔ reserve"]
 ```
 
 ---
@@ -32,7 +38,7 @@ router delivers `net` USDC from the payer (maker) to the receiver (taker). It is
 own router (`KeelSwapVMRouter`, which extends `AquaOpcodes` and appends the opcode) and exercised via
 a program built by `KeelFundingProgram`.
 
-SwapVM is one-directional (maker → taker), but a funding swap is two-sided, so a Keel position is
+SwapVM is one-directional (maker → taker), but a funding swap is two-sided, so a TenorFi position is
 **two mirror orders**: one pays the hedger when `realized > fixed` (`makerPaysAbove = true`), the
 mirror pays the reserve when `realized < fixed` (`makerPaysAbove = false`). Each order pays `0`
 outside its own direction (so a maker is never debited the wrong way) and is **bound to the agreed
@@ -81,8 +87,9 @@ function _opcodes() internal pure override
 
 **Why it's load-bearing.** The swap *literally executes as our opcode* — Aqua/SwapVM is the
 settlement engine, not a wrapper. A funding-rate swap is a novel "sophisticated DeFi position" (a
-derivative), and "define your own instruction" is the invited use. Collateral stays alive via Aqua
-virtual balances. **SwapVM is scored higher** — and we use it for real.
+derivative), and "define your own instruction" is the invited use. **Aqua pulls the fixed premium
+straight from the user's wallet just-in-time — they lock up zero collateral** (the headline edge vs.
+Strips/IPOR, which lock margin dead for weeks). **SwapVM is scored higher** — and we use it for real.
 
 **Status / qualification.** Built; opcode unit-tested + a deploy-wiring test in the single Foundry
 package. Settlement is one token, one direction (`tokenIn ≠ tokenOut` is enforced, so the hedge
@@ -172,28 +179,30 @@ code path, no contract change — but keep ≥1 real CRE write for the bounty.
 
 ## LI.FI — Composer ($4,000)
 
-**What we build.** One-click dual-leg onboarding: a LI.FI Composer Flow bridges the user's USDC from
-any chain and, in the same flow, (a) deposits collateral into Hyperliquid (HyperCore) for the perp
-leg and (b) opens the Keel swap (ships the leg into Aqua via `KeelFundingProgram`/`KeelSwapVMRouter`). The MCP uses Composer as its execution layer
-(Agentic Workflows track). *(Section owned by the integration lead; design-doc §6 has the flow.)*
+**What we build.** One-click onboarding: a LI.FI Composer Flow bridges the user's USDC from any chain
+and, in the same flow, (a) funds the Hyperliquid perp (HyperCore) margin and (b) activates the TenorFi
+subscription (authorizes Aqua to pull the fixed premium — **no collateral deposit into TenorFi**). The MCP
+uses Composer as its execution layer (Agentic Workflows track). *(Section owned by the integration lead;
+design-doc §6 has the flow.)*
 
 ```mermaid
 flowchart TB
     USER["USDC on any chain"] -->|LI.FI Composer Flow| BRIDGE["bridge to Base mainnet / HyperCore"]
-    BRIDGE --> DEP["deposit collateral → Hyperliquid (perp leg)"]
-    BRIDGE --> OPEN["ship Keel leg into Aqua (hedge leg)"]
+    BRIDGE --> DEP["fund the Hyperliquid perp margin (perp leg)"]
+    BRIDGE --> OPEN["authorize the Aqua premium pull (TenorFi subscription)"]
 ```
 
 **Why it's load-bearing.** A hedger's capital is rarely already on the settlement chain; without
-LI.FI, funding the hedge is a manual multi-step bridge. Composer makes "fund + open both legs" a
-single confirmation. **Open item (integration lead):** confirm a single Flow can chain an arbitrary
-contract call (the Aqua `ship` that opens the Keel leg) alongside the HL deposit; else two sequenced calls behind one MCP confirmation.
+LI.FI, funding the perp and activating the subscription is a manual multi-step bridge. Composer makes
+"fund the perp + start the subscription" a single confirmation. **Open item (integration lead):** confirm
+a single Flow can chain the Aqua authorization alongside the HL deposit; else two sequenced calls behind
+one MCP confirmation.
 
 ---
 
 ## Honesty rules (say these on stage)
 
 - **Never claim "first"** — Rho is live (see design-doc §12). We compete on Aqua-native execution +
-  live collateral + the Ethena demo.
+  zero user collateral (premium pulled as you go) + the Ethena demo.
 - **Real vs scripted:** the lock + USDC settlements are real (Base mainnet); the Ethena crash is a
   *replay* of real historical funding on a slider.

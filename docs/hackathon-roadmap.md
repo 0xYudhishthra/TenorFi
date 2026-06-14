@@ -1,4 +1,4 @@
-# Keel — Hackathon Execution Roadmap (8h sprint)
+# TenorFi — Hackathon Execution Roadmap (8h sprint)
 
 > ⚠️ **Historical** — this is the original 8h sprint plan and is **not** the current state. Superseded by
 > [`flows.md`](flows.md) (canonical flow), [`design-doc.md`](design-doc.md), and [`pitch.md`](pitch.md).
@@ -26,7 +26,7 @@
 | Funding index units | **int256, 1e18, per-period fractional rate** | matches `KeelSwap`; edge converts annualized → per-period |
 | Ledger | real hardware sign for **open / close / topUp**; "re-match" narrated/stubbed | "continue" + "close" are the real branches |
 | CRE | must land **≥1 real on-chain write** (for the bounty); **EOA relayer** is the live-loop reliability fallback | don't let a flaky DON kill the demo loop |
-| MCP | **PRIMARY DEMO INTERFACE** — conversational agent drives Hyperliquid + Keel swap, gates brink decision to Ledger | the hero; simple web chat interface for fallback if MCP flaky |
+| MCP | **PRIMARY DEMO INTERFACE** — conversational agent drives Hyperliquid + TenorFi swap, gates brink decision to Ledger | the hero; simple web chat interface for fallback if MCP flaky |
 
 ---
 
@@ -129,11 +129,11 @@ DEPLOY contracts (You, first 30 min)  ──unblocks──►  everyone
 
 **THE CONVERSATIONAL FLOW (MCP-driven, agent proposes / human disposes):**
 
-1. **Open via conversation:** User tells the MCP: *"Create a long on BTC on Hyperliquid and fix the funding rate."* MCP reads available offers, presents options, user picks one. **Agent proposes → user signs on Ledger → both legs open** (Hyperliquid perp + Keel swap, real txs on Base mainnet).
+1. **Open via conversation:** User tells the MCP: *"Create a long on BTC on Hyperliquid and fix the funding rate."* MCP reads available offers, presents options, user picks one. **Agent proposes → user signs on Ledger → both legs open** (Hyperliquid perp + TenorFi swap, real txs on Base mainnet).
 
-2. **Live settlement loop:** Compressed periods (120s each) settle automatically. Show MCP monitoring: *"AFR is 0.15%, FFR is 0.10% — funding is high, protocol pays you $X, topping up your Hyperliquid margin."* Real USDC movements on-chain.
+2. **Live settlement loop:** Compressed periods (120s each) settle automatically. Show MCP monitoring: *"AFR is ~13% APR, FFR is 7.3% APR — funding is high, protocol pays you $X, topping up your Hyperliquid margin."* Real USDC movements on-chain.
 
-3. **The Ethena comparison:** Narrate alongside: *"This is the Oct-2025 crash that bled Ethena $8B. Your rate? Still locked at 10%."* Show historical data vs flat locked line.
+3. **The Ethena comparison:** Narrate alongside: *"This is the Oct-2025 crash that bled Ethena $8B. Your rate? Still locked at 7.3%."* Show historical data vs flat locked line.
 
 4. **The Ledger moment (hero):** Drive funding extreme → collateral hits brink. MCP detects it and says: *"Your collateral is low. Options: (1) Close now, (2) Add more collateral and continue. Sign on your Ledger to decide."* **Human picks up Ledger, signs the decision.** *Agent proposes, human disposes* — demonstrated live, not claimed.
 

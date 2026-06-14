@@ -42,13 +42,8 @@ settlement: a sophisticated DeFi position (a funding-rate swap / interest-rate-s
 spot trade. It reads an on-chain funding index, nets fixed-vs-realized, clamps to a per-period cap,
 and settles over **Aqua virtual balances** so collateral stays live in the user's wallet. We deployed
 our **own SwapVM router** (the opcode appended to Aqua's opcode set) on Base mainnet, reusing the
-canonical Aqua. Pull Aqua out and there is no settlement venue.
-
-**Why we qualify (maps to the requirements):** ✅ *modifies SwapVM / defines a custom instruction*
-(scored higher); ✅ *on-chain token transfers demonstrated* — real USDC moves through the opcode on a
-**Base-mainnet fork** and on the **live deployment** (`test_deployedStack_settlesRealCREValue`), plus a
-Base-mainnet deploy; ✅ *positions shown via tests + scripts* (38 Foundry tests, `Ship`/`Settle`); ✅
-*proper multi-commit git history* (no single final-day commit).
+canonical Aqua. Pull Aqua out and there is no settlement venue. Real USDC moves through the opcode on
+both a Base-mainnet fork and the live deployment.
 
 **Link to the line of code:**
 - Custom opcode: `https://github.com/0xYudhishthra/TenorFi/blob/main/packages/contracts/src/swapvm/FundingSettle.sol#L53`
@@ -80,11 +75,6 @@ with a real on-chain write.
 - On-chain consumer `onReport`: `https://github.com/0xYudhishthra/TenorFi/blob/main/packages/contracts/src/KeelFundingReceiver.sol#L85`
 - Live on Base mainnet: receiver `0x7b7Ca2269f865C3448015173D433CcD7782aF582`, index `0x545f162204A92CEbeb12AA0A4AaDF777d6905005`; verified write at period 494834.
 
-**Why we qualify (maps to the requirements):** ✅ *a CRE Workflow used as the orchestration layer* —
-it's the oracle the whole settlement reads; ✅ *integrates a blockchain with an external API* (Base ←
-Hyperliquid funding API); ✅ *a successful CRE CLI simulation **and** a real on-chain write* (period
-494834); ✅ *meaningfully used* — without the funding number there is nothing to settle.
-
 **Ease of use (1–10): 8.** The `@chainlink/cre-sdk` workflow model (cron trigger → HTTP capability →
 `ConsensusAggregationByFields` → `writeReport`) was clean, and the canonical `IReceiver` consumer
 pattern mapped directly to our contract.
@@ -102,10 +92,6 @@ user's USDC from any chain to Base and, in a single signature, composes the whol
 Flow — fund the Hyperliquid perp leg **and** activate the TenorFi position — so the user opens both
 legs of the delta-neutral hedge in one transaction instead of assembling it by hand across two venues.
 Composer isn't cosmetic: the hedge only works if both legs open together.
-
-**Why we qualify (maps to the requirements):** ✅ *integrates LI.FI Composer as a core part*; ✅
-*working demo + open-source code* (`packages/lifi`); ✅ clearly explained (the dual-leg Flow). *(Also a
-fit for the **Agentic Workflows $4,000** track — our MCP agent uses Composer as its execution layer.)*
 
 **Link to the line of code:**
 - Composer flow: `https://github.com/0xYudhishthra/TenorFi/blob/main/packages/lifi/src/execute.ts`

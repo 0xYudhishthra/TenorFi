@@ -8,7 +8,8 @@ import { sendError } from "../errors.js";
 
 const ResultBody = z
   .object({
-    txHash: z.string().regex(/^0x[0-9a-fA-F]+$/).optional(),
+    // HL L1 actions have no EVM tx hash — accept any non-empty ref (order id/status).
+    txHash: z.string().min(1).optional(),
     error: z.string().optional(),
   })
   .refine((b) => b.txHash || b.error, {

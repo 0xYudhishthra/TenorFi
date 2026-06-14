@@ -1,0 +1,34 @@
+{
+  "name": "@keel/hyperliquid",
+  "version": "0.0.1",
+  "description": "Hyperliquid API client for Keel — read funding/positions, place perp orders, top up margin.",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
+    "validate:write": "node --env-file=../../.env --import tsx scripts/validate-write.ts"
+  },
+  "dependencies": {
+    "@nktkas/hyperliquid": "^0.32.2",
+    "viem": "^2.52.2"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.3",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
+  }
+}

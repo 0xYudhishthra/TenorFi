@@ -7,6 +7,9 @@ import { createTransport } from "@keel/hyperliquid";
 import { CHAINS } from "@keel/lifi";
 import { createFundingService } from "../core/services/funding.js";
 import { createHedgeService } from "../core/services/hedge.js";
+import { createPositionService } from "../core/services/position.js";
+import { createPositionRepo } from "../core/repos/positions.js";
+import { createDb } from "../core/repos/db.js";
 import { createApp } from "./app.js";
 
 // A funded address only matters for execution; quoting just needs a valid one.
@@ -18,6 +21,7 @@ function app() {
     funding: createFundingService({ transport: createTransport("mainnet") }),
     // No keelTarget → open leg is skipped (contract not deployed yet).
     hedge: createHedgeService({ keelChain: CHAINS.base }),
+    positions: createPositionService(createPositionRepo(createDb(":memory:"))),
   });
 }
 

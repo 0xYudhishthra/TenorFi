@@ -45,10 +45,11 @@ contract Ship is Script {
         // The quoted fixed rate (FFR) is a per-order value — re-quote by shipping a new order at a
         // new FIXED_RATE; existing positions keep their locked rate (no redeploy, no global setter).
         // 7.3% APR (the fair/break-even rate from a year of real BTC funding — see
-        // docs/research/analysis.md) expressed PER-MINUTE in WAD: 7.3e16 / 525600 ≈ 1.39e11
-        // (= per-hour / 60), matching periodSeconds=60. The CRE must likewise write R = hourly/60 per
-        // minute-period, so 60 minutes sum to the correct hourly amount. Change via the FIXED_RATE env.
-        int256 fixedRate = vm.envOr("FIXED_RATE", int256(138_888_888_888));
+        // docs/research/analysis.md) as a PER-HOUR rate in WAD: 7.3e16 / 8760 ≈ 8.33e12 — the same
+        // (hourly) frame as the realized funding the CRE records. The demo runs periodSeconds=60 as
+        // COMPRESSED time (each minute = one funding-hour): the relayer writes the real hourly value
+        // into each minute-slot and each minute settles one full hour's amount — no division.
+        int256 fixedRate = vm.envOr("FIXED_RATE", int256(8_333_333_333_333));
         uint256 cap = vm.envOr("CAP", uint256(4e16)); // 4% per-period clamp
         require(fixedRate > 0, "fixedRate must be positive");
 

@@ -4,26 +4,12 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createTransport } from "@keel/hyperliquid";
 import { CHAINS } from "@keel/lifi";
-import { createFundingService } from "../core/services/funding.js";
-import { createHedgeService } from "../core/services/hedge.js";
-import { createPositionService } from "../core/services/position.js";
-import { createPositionRepo } from "../core/repos/positions.js";
-import { createDb } from "../core/repos/db.js";
-import { createApp } from "./app.js";
+import { makeTestApp } from "./test-app.js";
 
 const FROM = "0x235713C4CA6A8cd2adc0333F64d1b453BfCdBbfd";
 
-function app() {
-  return createApp({
-    network: "mainnet",
-    funding: createFundingService({ transport: createTransport("mainnet") }),
-    // Real LI.FI client; no keelTarget → open leg skipped (contract not deployed).
-    hedge: createHedgeService({ keelChain: CHAINS.base }),
-    positions: createPositionService(createPositionRepo(createDb(":memory:"))),
-  });
-}
+const app = makeTestApp;
 
 function createBody() {
   return {

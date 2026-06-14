@@ -5,6 +5,8 @@ import { Hono } from "hono";
 import type { FundingService } from "../core/services/funding.js";
 import type { HedgeService } from "../core/services/hedge.js";
 import type { PositionService } from "../core/services/position.js";
+import type { SettleService } from "../core/services/settle.js";
+import type { RebalanceService } from "../core/services/rebalance.js";
 import { fundingRoutes } from "./routes/funding.js";
 import { hedgeRoutes } from "./routes/hedge.js";
 import { positionsRoutes } from "./routes/positions.js";
@@ -14,6 +16,8 @@ export interface AppDeps {
   funding: FundingService;
   hedge: HedgeService;
   positions: PositionService;
+  settle: SettleService;
+  rebalance: RebalanceService;
 }
 
 export function createApp(deps: AppDeps): Hono {
@@ -25,7 +29,7 @@ export function createApp(deps: AppDeps): Hono {
 
   app.route("/funding", fundingRoutes(deps.funding));
   app.route("/hedge", hedgeRoutes(deps.hedge, deps.positions));
-  app.route("/positions", positionsRoutes(deps.positions));
+  app.route("/positions", positionsRoutes(deps.positions, deps.settle, deps.rebalance));
 
   return app;
 }

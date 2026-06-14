@@ -10,21 +10,31 @@ import { createPositionRepo } from "./core/repos/positions.js";
 import { createFundingService } from "./core/services/funding.js";
 import { createHedgeService } from "./core/services/hedge.js";
 import { createPositionService } from "./core/services/position.js";
+import { createSettleService } from "./core/services/settle.js";
+import { createRebalanceService } from "./core/services/rebalance.js";
 import { createApp } from "./http/app.js";
 
 const config = loadConfig();
 
 const transport = createTransport(config.HL_NETWORK);
+const keelTarget = config.KEELSWAP_ADDRESS_BASE as `0x${string}` | undefined;
+
 const funding = createFundingService({ transport });
-const hedge = createHedgeService({
-  keelChain: CHAINS.base,
-  keelTarget: config.KEELSWAP_ADDRESS_BASE as `0x${string}` | undefined,
-});
+const hedge = createHedgeService({ keelChain: CHAINS.base, keelTarget });
 const positions = createPositionService(
   createPositionRepo(createDb(config.DATABASE_PATH)),
 );
+const settle = createSettleService(funding, { keelTarget });
+const rebalance = createRebalanceService({ transport });
 
-const app = createApp({ network: config.HL_NETWORK, funding, hedge, positions });
+const app = createApp({
+  network: config.HL_NETWORK,
+  funding,
+  hedge,
+  positions,
+  settle,
+  rebalance,
+});
 
 serve({ fetch: app.fetch, port: config.PORT }, (info) => {
   console.log(`keel-api listening on :${info.port} (${config.HL_NETWORK})`);

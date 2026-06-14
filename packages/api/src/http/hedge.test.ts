@@ -3,27 +3,13 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createTransport } from "@keel/hyperliquid";
 import { CHAINS } from "@keel/lifi";
-import { createFundingService } from "../core/services/funding.js";
-import { createHedgeService } from "../core/services/hedge.js";
-import { createPositionService } from "../core/services/position.js";
-import { createPositionRepo } from "../core/repos/positions.js";
-import { createDb } from "../core/repos/db.js";
-import { createApp } from "./app.js";
+import { makeTestApp } from "./test-app.js";
 
 // A funded address only matters for execution; quoting just needs a valid one.
 const FROM = "0x235713C4CA6A8cd2adc0333F64d1b453BfCdBbfd";
 
-function app() {
-  return createApp({
-    network: "mainnet",
-    funding: createFundingService({ transport: createTransport("mainnet") }),
-    // No keelTarget → open leg is skipped (contract not deployed yet).
-    hedge: createHedgeService({ keelChain: CHAINS.base }),
-    positions: createPositionService(createPositionRepo(createDb(":memory:"))),
-  });
-}
+const app = makeTestApp;
 
 test("POST /hedge/quote builds the deposit leg, skips open when unwired", async () => {
   const res = await app().request("/hedge/quote", {

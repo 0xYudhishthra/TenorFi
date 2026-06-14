@@ -3,7 +3,7 @@ pragma solidity 0.8.30;
 
 import { Context } from "@1inch/swap-vm/src/libs/VM.sol";
 
-import { FundingSettle } from "../FundingSettle.sol";
+import { FundingSettle } from "../../src/swapvm/FundingSettle.sol";
 
 /// @notice Exposes the internal `_fundingSettle` opcode for unit testing. A zero-initialised
 ///         Context is sufficient because the instruction only reads `args` + the funding index

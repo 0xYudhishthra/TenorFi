@@ -1,7 +1,0 @@
-node_modules
-package-lock.json
-artifacts
-cache
-typechain-types
-contracts/hardhat-dependency-compiler
-.env

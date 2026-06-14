@@ -2,10 +2,16 @@
   "name": "@keel/contracts",
   "version": "0.0.0",
   "private": true,
-  "description": "Keel settlement core: KeelSwap + FundingIndex latch.",
+  "description": "Keel settlement core (KeelSwap + FundingIndex) + custom SwapVM funding-settlement opcode. Single Foundry environment.",
   "scripts": {
     "build": "forge build",
     "test": "forge test -vv",
     "fmt": "forge fmt"
+  },
+  "dependencies": {
+    "@1inch/solidity-utils": "^6.8.0",
+    "@1inch/aqua": "https://github.com/1inch/aqua",
+    "@1inch/swap-vm": "https://github.com/1inch/swap-vm#0.0.4",
+    "@openzeppelin/contracts": "^5.4.0"
   }
 }

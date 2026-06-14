@@ -11,7 +11,7 @@
 
 | Decision | Choice | Why |
 |---|---|---|
-| Chain | **HyperEVM testnet**; local **anvil** as demo fallback | oracle source = settlement chain; anvil if testnet is flaky |
+| Chain | **Ethereum Sepolia**; local **anvil** as demo fallback | oracle source = settlement chain; anvil if testnet is flaky |
 | Settlement | **Plain-Solidity `KeelSwap`** (no SwapVM opcode) | already tested; opcode is the long pole → roadmap |
 | Market structure | **One matched swap** (1 hedger + 1 speculator), no AMM/LP | MVP scope; LP backstop is phase 2 |
 | Accumulator | **Discrete per-period** (already built) | no time for cumulative `cumIndex` |
@@ -57,13 +57,13 @@ DEPLOY contracts (You, first 30 min)  ──unblocks──►  everyone
 ## 3. Owners & parallel tracks
 
 ### You — contracts · backend · integration
-1. **(T+0:00–0:30) Deploy.** Deploy `MockUSDC`, `FundingIndex`, `KeelSwap` to HyperEVM testnet. Write `deployments.json` + ABIs. Faucet USDC to demo wallets. **Publish to the team.**
+1. **(T+0:00–0:30) Deploy.** Deploy `MockUSDC`, `FundingIndex`, `KeelSwap` to Ethereum Sepolia. Write `deployments.json` + ABIs. Faucet USDC to demo wallets. **Publish to the team.**
 2. **(0:30–1:15) Contract gaps.** Add `topUp(swapId, side, amount)` for the Ledger "continue" branch (+ 2–3 tests). Write a **seed script** that opens a matched demo swap with known params (hedger, speculator, notional, fixedRate, cap, period range).
 3. **(1:15–3:30) Backend/keeper.** Tiny indexer/keeper (viem): fires `settle(id, period)` each compressed period (120s), exposes swap state via simple REST API or direct chain reads for MCP. Stand up the **EOA relayer** path so it's ready if CRE slips.
 4. **(3:30–6:00) Integration support.** Help Shaun wire MCP tools to contracts, provide Hyperliquid testnet API integration guidance, ensure settlement loop + Ledger signing paths work end-to-end. Build simple web chat fallback if MCP integration hits blockers.
 
 ### Axel — Chainlink CRE
-1. **(0:00–0:30) Recon.** HyperEVM RPC + check CRE KeystoneForwarder availability. Get the `FundingIndex` address from You.
+1. **(0:00–0:30) Recon.** Ethereum Sepolia RPC + check CRE KeystoneForwarder availability. Get the `FundingIndex` address from You.
 2. **(0:30–2:30) CRE workflow.** HTTP fetch Hyperliquid BTC funding → DON consensus → `setFundingIndex(period, value)` via the forwarder (set `onlyForwarder` to the forwarder addr). **Goal: one real on-chain write you can screenshot for the bounty.**
 3. **CHECKPOINT (T+2:30):** Is CRE writing reliably? **If NO → switch the live demo loop to You's EOA relayer**, but keep the one real CRE write for the Chainlink submission. Don't burn past 3h on CRE.
 4. **(2:30–4:00) Replay data + harden.** Pull historical BTC funding for the Ethena replay; hand to Shaun. Make the CRE write loop steady for the demo if it's working.
@@ -92,7 +92,7 @@ DEPLOY contracts (You, first 30 min)  ──unblocks──►  everyone
 
 | Time | Milestone | Gate |
 |---|---|---|
-| 17:00 | **Standup** — lock §0 decisions, assign, confirm Ledger hw + HyperEVM RPC | go/no-go on chain |
+| 17:00 | **Standup** — lock §0 decisions, assign, confirm Ledger hw + Ethereum Sepolia RPC | go/no-go on chain |
 | 17:30 | **Contracts deployed**, `deployments.json` published | everyone unblocked |
 | 19:00 | MCP server scaffold live; CRE first write attempt; Ledger signs a test tx | — |
 | 19:30 | **CRE checkpoint** — real write or fall back to relayer | live funding source decided |
@@ -109,8 +109,8 @@ DEPLOY contracts (You, first 30 min)  ──unblocks──►  everyone
 
 | Risk | Trigger | Fallback |
 |---|---|---|
-| CRE slow / forwarder missing on HyperEVM | not writing by 19:30 | EOA relayer posts the real API-derived index; keep 1 CRE write for the bounty |
-| HyperEVM testnet down / RPC flaky | deploy fails in first 30 min | Base Sepolia, else local **anvil** for the demo (we need no EIP-1153 — plain Solidity) |
+| CRE slow / forwarder missing on Ethereum Sepolia | not writing by 19:30 | EOA relayer posts the real API-derived index; keep 1 CRE write for the bounty |
+| Ethereum Sepolia down / RPC flaky | deploy fails in first 30 min | Ethereum Sepolia, else local **anvil** for the demo (we need no EIP-1153 — plain Solidity) |
 | Ledger hardware / signing library issues | confirmed at standup | software signer, keep Ledger framing; get ≥1 real Ledger sign on video if possible |
 | MCP integration blockers (SDK issues, tool wiring) | behind at 21:30 | simple web chat interface calling contract functions directly; demonstrate agent-gated flow via script |
 | Hyperliquid testnet API rate limits / flaky | during MCP testing | mock Hyperliquid responses in MCP tools; show API integration in code, demo with mocked data |
@@ -122,7 +122,7 @@ DEPLOY contracts (You, first 30 min)  ──unblocks──►  everyone
 
 **THE CONVERSATIONAL FLOW (MCP-driven, agent proposes / human disposes):**
 
-1. **Open via conversation:** User tells the MCP: *"Create a long on BTC on Hyperliquid and fix the funding rate."* MCP reads available offers, presents options, user picks one. **Agent proposes → user signs on Ledger → both legs open** (Hyperliquid perp + Keel swap, real txs on HyperEVM).
+1. **Open via conversation:** User tells the MCP: *"Create a long on BTC on Hyperliquid and fix the funding rate."* MCP reads available offers, presents options, user picks one. **Agent proposes → user signs on Ledger → both legs open** (Hyperliquid perp + Keel swap, real txs on Ethereum Sepolia).
 
 2. **Live settlement loop:** Compressed periods (120s each) settle automatically. Show MCP monitoring: *"AFR is 0.15%, FFR is 0.10% — funding is high, protocol pays you $X, topping up your Hyperliquid margin."* Real USDC movements on-chain.
 
@@ -132,7 +132,7 @@ DEPLOY contracts (You, first 30 min)  ──unblocks──►  everyone
 
 5. **Closing beat:** MCP confirms: *"Position closed. You locked certainty when the market swung wild."*
 
-**Be honest on screen:** the swap, settlements, and Ledger signatures are real (HyperEVM testnet); the Ethena comparison uses real historical funding data in the narration.
+**Be honest on screen:** the swap, settlements, and Ledger signatures are real (Ethereum Sepolia); the Ethena comparison uses real historical funding data in the narration.
 
 ---
 
@@ -140,7 +140,7 @@ DEPLOY contracts (You, first 30 min)  ──unblocks──►  everyone
 
 - [ ] Demo video (MCP conversation flow from script above — show terminal/chat with MCP, Ledger signing moment)
 - [ ] Project description + the Ethena hook + **"agent proposes, human disposes" thesis**
-- [ ] Architecture diagram (HL API → MCP → CRE → KeelSwap → Ledger, on HyperEVM)
+- [ ] Architecture diagram (HL API → MCP → CRE → KeelSwap → Ledger, on Ethereum Sepolia)
 - [ ] Repo link + deployed addresses (`deployments.json`) + **MCP server code**
 - [ ] Bounty applications:
   - **1inch Aqua** (funding-rate swap built on Aqua, collateral as virtual balances; plain Solidity settlement core, SwapVM opcode is roadmap)

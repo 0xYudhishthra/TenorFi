@@ -2,6 +2,7 @@
 // the workers consume the same services; this file only knows about routing.
 
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import type { FundingService } from "../core/services/funding.js";
 import type { HedgeService } from "../core/services/hedge.js";
 import type { PositionService } from "../core/services/position.js";
@@ -29,6 +30,10 @@ export interface AppDeps {
 
 export function createApp(deps: AppDeps): Hono {
   const app = new Hono();
+
+  // Browser CORS — the web app (tenor-web) fetches these endpoints cross-origin.
+  // Without this every browser fetch is blocked and the UI falls back to mock data.
+  app.use("*", cors({ origin: "*", allowMethods: ["GET", "POST", "OPTIONS"] }));
 
   app.get("/health", (c) =>
     c.json({ ok: true, service: "keel-api", network: deps.network }),

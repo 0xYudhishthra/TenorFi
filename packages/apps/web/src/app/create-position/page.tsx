@@ -258,7 +258,7 @@ export default function CreatePositionPage() {
               <div className="legrow">
                 <div className="leg">
                   <div className="t">① Hyperliquid perp</div>
-                  <div className="d">Collateral deposited via LI.FI; the agent places the order.</div>
+                  <div className="d">Collateral deposited via LI.FI; the perp order is placed in the same flow.</div>
                 </div>
                 <div className="leg">
                   <div className="t">② TenorFi position</div>

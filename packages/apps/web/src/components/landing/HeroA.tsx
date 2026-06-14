@@ -36,7 +36,7 @@ export default function HeroA() {
           </h1>
           <p className="lead sub">
             Perp funding swings every hour. TenorFi turns your <em className="clay">variable</em>{" "}
-            rate into a <em className="flat">fixed</em> one — in one conversation. Your
+            rate into a <em className="flat">fixed</em> one — in a few clicks. Your
             collateral never goes idle.
           </p>
           <div className="cta-row">

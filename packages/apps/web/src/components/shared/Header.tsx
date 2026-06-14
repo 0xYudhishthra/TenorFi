@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { BackgroundGradient } from "@/components/ui/background-gradient";
 
 export default function Header() {
   const pathname = usePathname();
@@ -38,18 +39,17 @@ export default function Header() {
         <a href="/#how" className="hide-sm">
           How it works
         </a>
-        <a href="/#mcp" className="hide-sm">
-          MCP
-        </a>
         <a href="/#faq" className="hide-sm">
           FAQ
         </a>
       </div>
 
       <div className="flex items-center gap-2.5">
-        <Link href="/create-position" className="btn btn-primary btn-sm">
-          Create a position
-        </Link>
+        <BackgroundGradient containerClassName="rounded-full" className="rounded-full">
+          <Link href="/create-position" className="btn btn-primary btn-sm">
+            Create a position
+          </Link>
+        </BackgroundGradient>
       </div>
 
       <style jsx>{`

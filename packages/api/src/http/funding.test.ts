@@ -4,12 +4,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createTransport } from "@keel/hyperliquid";
+import { CHAINS } from "@keel/lifi";
 import { createFundingService } from "../core/services/funding.js";
+import { createHedgeService } from "../core/services/hedge.js";
 import { createApp } from "./app.js";
 
 const app = createApp({
   network: "mainnet",
   funding: createFundingService({ transport: createTransport("mainnet") }),
+  hedge: createHedgeService({ keelChain: CHAINS.base }),
 });
 
 test("GET /funding/:market returns a current snapshot", async () => {

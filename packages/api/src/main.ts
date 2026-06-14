@@ -3,16 +3,22 @@
 
 import { serve } from "@hono/node-server";
 import { createTransport } from "@keel/hyperliquid";
+import { CHAINS } from "@keel/lifi";
 import { loadConfig } from "./config.js";
 import { createFundingService } from "./core/services/funding.js";
+import { createHedgeService } from "./core/services/hedge.js";
 import { createApp } from "./http/app.js";
 
 const config = loadConfig();
 
 const transport = createTransport(config.HL_NETWORK);
 const funding = createFundingService({ transport });
+const hedge = createHedgeService({
+  keelChain: CHAINS.base,
+  keelTarget: config.KEELSWAP_ADDRESS_BASE as `0x${string}` | undefined,
+});
 
-const app = createApp({ network: config.HL_NETWORK, funding });
+const app = createApp({ network: config.HL_NETWORK, funding, hedge });
 
 serve({ fetch: app.fetch, port: config.PORT }, (info) => {
   console.log(`keel-api listening on :${info.port} (${config.HL_NETWORK})`);

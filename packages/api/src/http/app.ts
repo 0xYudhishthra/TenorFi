@@ -3,11 +3,14 @@
 
 import { Hono } from "hono";
 import type { FundingService } from "../core/services/funding.js";
+import type { HedgeService } from "../core/services/hedge.js";
 import { fundingRoutes } from "./routes/funding.js";
+import { hedgeRoutes } from "./routes/hedge.js";
 
 export interface AppDeps {
   network: "mainnet" | "testnet";
   funding: FundingService;
+  hedge: HedgeService;
 }
 
 export function createApp(deps: AppDeps): Hono {
@@ -18,6 +21,7 @@ export function createApp(deps: AppDeps): Hono {
   );
 
   app.route("/funding", fundingRoutes(deps.funding));
+  app.route("/hedge", hedgeRoutes(deps.hedge));
 
   return app;
 }

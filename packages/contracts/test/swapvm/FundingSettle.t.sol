@@ -73,4 +73,22 @@ contract FundingSettleTest is Test {
         vm.expectRevert(FundingSettle.UnauthorizedTaker.selector);
         harness.settle(_args(address(0xBEEF), true)); // ctx taker is 0, != 0xBEEF
     }
+
+    // Keeper fires in a LATER period than the one CRE wrote: the opcode reads the CURRENT (unwritten)
+    // period and reverts FundingNotSet — it never silently settles a stale value from an earlier period.
+    function test_latePeriod_revertsFundingNotSet() public {
+        idx.setFundingIndex(_period(), int256((ONE * 3) / 100)); // CRE wrote THIS period
+        vm.warp(block.timestamp + PERIOD_SECONDS); // keeper late → now in the next, unwritten period
+        vm.expectRevert(FundingSettle.FundingNotSet.selector);
+        harness.settle(_args(address(0), true));
+    }
+
+    // Funding can go negative (R < 0 < F). The hedger-pays-reserve mirror leg pays (F - R) * N; the
+    // realized rate being below fixed is exactly the "premium" direction.
+    function test_negativeFunding_mirrorLegPays() public {
+        int256 r = -int256((ONE * 2) / 100); // R = -2%
+        idx.setFundingIndex(_period(), r);
+        // diff = R - F = -3% (|.| < cap), so mirror leg owed = (F - R) * N
+        assertEq(harness.settle(_args(address(0), false)), uint256(F - r) * N / ONE);
+    }
 }

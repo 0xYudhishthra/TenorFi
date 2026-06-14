@@ -5,8 +5,9 @@
 //
 // Modules are filled in across Phase 1:
 //   1.1 config       — network base URLs + switch          [done]
-//   1.2 read client  — getFunding, getPositions, getAccountState
+//   1.2 read client  — getFunding, getPositions, getAccountState  [done]
 //   1.3 exchange     — placePerpOrder, updateLeverage, topUpMargin (agent wallet)
 //   1.4 helper       — openPerpLong(market, usd, leverage)
 
 export * from "./config.js";
+export * from "./read.js";

@@ -1,0 +1,3 @@
+# local python venv for the backtest (heavy; recreate with: python -m venv .venv)
+.venv/
+__pycache__/

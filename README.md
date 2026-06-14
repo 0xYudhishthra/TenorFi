@@ -42,7 +42,7 @@ When a side's collateral can no longer cover one more worst-case period (`remain
 | Component | What it does | Where |
 |-----------|--------------|-------|
 | **1inch Aqua / SwapVM** | Custom `_fundingSettle` instruction settles a period as `amountOut = net`; collateral stays live via virtual balances | `packages/contracts/src/swapvm` |
-| **Chainlink CRE** | Funding-rate oracle: reads Hyperliquid BTC funding → DON consensus → on-chain `FundingIndex` | `packages/cre` · [`docs/bounty-integrations.md`](docs/bounty-integrations.md) |
+| **Chainlink CRE** | Funding-rate oracle: reads Hyperliquid BTC funding → DON consensus → on-chain `FundingIndex` | `cre/keel-funding` · [`docs/bounty-integrations.md`](docs/bounty-integrations.md) |
 | **LI.FI Composer** | Cross-chain collateral onboarding: fund + open the hedge with USDC from any chain | (integration lead) |
 | **Settlement** | `_fundingSettle` SwapVM opcode over Aqua (no custodial contract — collateral stays live) + `FundingIndex` (write-once latch) | `packages/contracts/src` |
 
@@ -74,22 +74,35 @@ flowchart TB
 |-----------|--------|-------|
 | Settlement — custom SwapVM opcode (`_fundingSettle` + router + program) over Aqua | **Built · unit + e2e + Base-mainnet fork** (settlement moves real USDC via Aqua) · double-settle guarded · no-default proven; Base mainnet deploy pending | `packages/contracts/src/swapvm` |
 | Funding latch (`FundingIndex`, write-once) | **Built** | `packages/contracts/src` |
-| Chainlink CRE consumer (`KeelFundingReceiver` onReport → FundingIndex) | **Built · 12 tests** | `packages/contracts/src` |
+| Chainlink CRE consumer (`KeelFundingReceiver` onReport → FundingIndex) | **Built · 14 tests** | `packages/contracts/src` |
 | Deploy script + wiring test (Base mainnet) | **Built · 1 test** | `packages/contracts/script` |
-| Chainlink CRE funding oracle | Planned (M2) | `packages/cre` |
+| Chainlink CRE funding oracle (Hyperliquid → DON → on-chain) | **Built · live write verified on Base mainnet** | `cre/keel-funding` |
 | LI.FI cross-chain onboarding | Planned | integration lead |
 | Keel MCP (agent front door) | Planned (M7) | `packages/mcp` |
 | Web app (lock UI + Ethena replay) | Planned (M5) | `apps/web` |
-| Base mainnet deployment | Pending | — |
+| Base mainnet deployment (funding stack) | **Live** — see below | `packages/contracts/deployments.json` |
+
+## Live deployment (Base mainnet, chain id 8453)
+
+The Chainlink CRE funding stack is deployed and the end-to-end write is verified on-chain: the CRE workflow read real Hyperliquid BTC funding, reached consensus, and wrote it through the forwarder into `FundingIndex`.
+
+| Contract | Address |
+|----------|---------|
+| `KeelFundingReceiver` (CRE `onReport` consumer) | [`0x7b7Ca2269f865C3448015173D433CcD7782aF582`](https://basescan.org/address/0x7b7Ca2269f865C3448015173D433CcD7782aF582) |
+| `FundingIndex` (write-once funding latch) | [`0x545f162204A92CEbeb12AA0A4AaDF777d6905005`](https://basescan.org/address/0x545f162204A92CEbeb12AA0A4AaDF777d6905005) |
+| `MockUSDC` (demo collateral) | [`0x3A515ADf6a5Ee9c2cD906f7523B7F8485144c6e8`](https://basescan.org/address/0x3A515ADf6a5Ee9c2cD906f7523B7F8485144c6e8) |
+| Base `MockKeystoneForwarder` (rotatable; sim `--broadcast`) | `0x5e342a8438b4f5d39e72875fcee6f76b39cce548` |
+
+Verified CRE write — tx [`0xd1b1e41b545a273e29f36a5f40f1238b0f32a3464bf7bc0698dcba78ff7e87f2`](https://basescan.org/tx/0xd1b1e41b545a273e29f36a5f40f1238b0f32a3464bf7bc0698dcba78ff7e87f2): `FundingIndex.getFundingIndex(494834)` returns `(12500000000000, true)` — Hyperliquid BTC funding `0.0000125` scaled to 1e18. Deployed via `script/DeployFunding.s.sol` (the CRE write path only; the full Aqua/SwapVM stack uses `script/Deploy.s.sol`).
 
 ## Repository layout
 
 ```
 keel/
 ├── docs/                 # design doc (source of truth), bounty + CRE notes, hackathon roadmap
+├── cre/                  # Chainlink CRE workflow (TypeScript/bun): Hyperliquid funding → DON → on-chain index
 ├── packages/
 │   ├── contracts/        # Foundry (single env) — settlement core (src/) + SwapVM opcode (src/swapvm/) + deploy (script/)
-│   ├── cre/              # Chainlink CRE workflow: Hyperliquid funding → on-chain index
 │   ├── keeper/           # per-period settle() trigger
 │   └── mcp/              # Keel MCP: read funding + operate the swap; brink → user confirm
 └── apps/

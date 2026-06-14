@@ -1,3 +1,6 @@
 packages:
   - "apps/*"
   - "packages/*"
+  # The Chainlink CRE workflow lives in packages/cre/* (keel-funding workflow + contracts ABIs).
+  # Managed by the single root pnpm lockfile (no per-package bun locks).
+  - "packages/cre/*"

@@ -32,6 +32,12 @@ router delivers `net` USDC from the payer (maker) to the receiver (taker). It is
 own router (`KeelSwapVMRouter`, which extends `AquaOpcodes` and appends the opcode) and exercised via
 a program built by `KeelFundingProgram`.
 
+SwapVM is one-directional (maker → taker), but a funding swap is two-sided, so a Keel position is
+**two mirror orders**: one pays the hedger when `realized > fixed` (`makerPaysAbove = true`), the
+mirror pays the reserve when `realized < fixed` (`makerPaysAbove = false`). Each order pays `0`
+outside its own direction (so a maker is never debited the wrong way) and is **bound to the agreed
+counterparty** — it reverts `UnauthorizedTaker` if anyone else tries to take it.
+
 ```mermaid
 flowchart TB
     KEEPER["keeper / CRE trigger (per period)"] -->|swap| ROUTER["KeelSwapVMRouter (our SwapVM)"]
@@ -44,16 +50,28 @@ flowchart TB
 **The opcode** (`packages/contracts/src/swapvm/FundingSettle.sol`):
 
 ```solidity
-function _fundingSettle(Context memory ctx, bytes calldata args) internal view {
-    (address fundingIndex, int256 fixedRate, uint256 cap, uint256 notional, uint256 periodSeconds) =
-        abi.decode(args, (address, int256, uint256, uint256, uint256));
+function _fundingSettle(Context memory ctx, bytes calldata args) internal {
+    (address fundingIndex, int256 fixedRate, uint256 cap, uint256 notional,
+     uint256 periodSeconds, address counterparty, bool makerPaysAbove) =
+        abi.decode(args, (address, int256, uint256, uint256, uint256, address, bool));
+
+    // Bind the order to the agreed counterparty: only they may take it (no payment theft).
+    if (ctx.query.taker != counterparty) revert UnauthorizedTaker();
 
     uint256 period = block.timestamp / periodSeconds;            // derived on-chain; program stays fixed
     (int256 realized, bool isSet) = IFundingIndex(fundingIndex).getFundingIndex(period);
     require(isSet, FundingNotSet());
 
+    // No double-settle (skipped during static quoting — cannot SSTORE in a staticcall).
+    if (!ctx.vm.isStaticContext) {
+        if (settled[ctx.query.orderHash][period]) revert AlreadySettled();
+        settled[ctx.query.orderHash][period] = true;
+    }
+
     int256 diff = _clamp(realized - fixedRate, cap);             // clamp(R − F, ±cap)
-    ctx.swap.amountOut = (_abs(diff) * notional) / RATE_ONE;     // net: maker(payer) → taker(receiver)
+    // This order only pays in its own direction; 0 otherwise (the mirror order pays the other leg).
+    int256 owed = makerPaysAbove ? (diff > 0 ? diff : int256(0)) : (diff < 0 ? -diff : int256(0));
+    ctx.swap.amountOut = (uint256(owed) * notional) / RATE_ONE;  // net: maker(payer) → taker(receiver)
 }
 ```
 
@@ -76,10 +94,14 @@ settlement engine, not a wrapper. A funding-rate swap is a novel "sophisticated 
 derivative), and "define your own instruction" is the invited use. Collateral stays alive via Aqua
 virtual balances. **SwapVM is scored higher** — and we use it for real.
 
-**Status / qualification.** Built; opcode unit-tested + a deploy-wiring test in the single Foundry
-package. Settlement is one token, one direction (`tokenIn ≠ tokenOut` is enforced, so the hedge
-position is the `tokenIn` with `amountIn = 0` via `allowZeroAmountIn`; USDC is `tokenOut`).
-Qualification: onchain token transfer in the demo ✓ · incremental git history ✓ · SwapVM used ✓.
+**Status / qualification.** Built and hardened. Each order settles one token, one direction
+(`tokenIn ≠ tokenOut` is enforced, so the hedge position is the `tokenIn` with `amountIn = 0` via
+`allowZeroAmountIn`; USDC is `tokenOut`); the two mirror orders cover both directions of the swap.
+Unit-tested (directional settlement, taker-bind, stranger-cannot-take, double-settle) + a deploy-wiring
+test + a **Base mainnet fork test** that runs the opcode against the **real deployed Aqua and real USDC**
+— **50 tests** total (48 offline + 2 Base-mainnet fork), plus a Slither pass and an adversarial audit
+([`security-review.md`](security-review.md)). Qualification: onchain token transfer in the demo ✓ ·
+incremental git history ✓ · SwapVM used ✓.
 
 ---
 

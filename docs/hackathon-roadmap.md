@@ -1,5 +1,12 @@
 # Keel — Hackathon Execution Roadmap (8h sprint)
 
+> ⚠️ **Historical** — this is the original 8h sprint plan and is **not** the current state. Superseded by
+> [`flows.md`](flows.md) (canonical flow), [`design-doc.md`](design-doc.md), and [`pitch.md`](pitch.md).
+> Ledger and the old demo script below are **no longer part of the project**; settlement is **Aqua-only**
+> (the custodial `KeelSwap` was removed); the deploy target is **Base mainnet** (the Aqua layer is
+> deployed + Basescan-verified); the custom SwapVM opcode is built (38 tests, Slither + adversarial audit).
+> Kept for the record.
+
 **Window:** 17:00 → 01:00 (submit early — treat 00:15 as the real deadline).
 **Team (4):** Axel (Chainlink CRE) · Tomas (Ledger + math) · Shaun (MCP + submission) · You (contracts, backend, integration).
 **Biggest risk already retired:** the settlement core (`KeelSwap` + `FundingIndex`) is built and green (25 tests). We demo on the **tested Solidity path** — the SwapVM opcode is cut to roadmap.

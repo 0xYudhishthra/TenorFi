@@ -32,6 +32,14 @@ router delivers `net` USDC from the payer (maker) to the receiver (taker). It is
 own router (`KeelSwapVMRouter`, which extends `AquaOpcodes` and appends the opcode) and exercised via
 a program built by `KeelFundingProgram`.
 
+SwapVM is one-directional (maker → taker), but a funding swap is two-sided, so a Keel position is
+**two mirror orders**: one pays the hedger when `realized > fixed` (`makerPaysAbove = true`), the
+mirror pays the reserve when `realized < fixed` (`makerPaysAbove = false`). Each order pays `0`
+outside its own direction (so a maker is never debited the wrong way) and is **bound to the agreed
+counterparty** — it reverts `UnauthorizedTaker` if anyone else tries to take it.
+
+> Canonical end-to-end flow (onboarding + per-period settlement, with diagrams): [`flows.md`](flows.md).
+
 ```mermaid
 flowchart TB
     KEEPER["keeper / CRE trigger (per period)"] -->|swap| ROUTER["KeelSwapVMRouter (our SwapVM)"]

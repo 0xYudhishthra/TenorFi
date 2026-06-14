@@ -17,6 +17,19 @@ export const positions = sqliteTable("positions", {
   updatedAt: integer("updated_at").notNull(),
 });
 
+export const executionIntents = sqliteTable("execution_intents", {
+  id: text("id").primaryKey(),
+  positionId: text("position_id").notNull(),
+  kind: text("kind").notNull(),
+  market: text("market").notNull(),
+  params: text("params"),
+  status: text("status").notNull(),
+  txHash: text("tx_hash"),
+  error: text("error"),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
+
 export const positionEvents = sqliteTable("position_events", {
   id: text("id").primaryKey(),
   positionId: text("position_id").notNull(),

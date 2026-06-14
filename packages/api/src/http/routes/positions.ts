@@ -6,6 +6,7 @@ import { z } from "zod";
 import type { PositionService } from "../../core/services/position.js";
 import type { SettleService } from "../../core/services/settle.js";
 import type { RebalanceService } from "../../core/services/rebalance.js";
+import type { ExecutionService } from "../../core/services/execution.js";
 import type { HedgePosition } from "../../core/domain/position.js";
 import { POSITION_STATUSES } from "../../core/domain/position.js";
 import { keelError } from "../../core/domain/errors.js";
@@ -49,6 +50,7 @@ export function positionsRoutes(
   positions: PositionService,
   settle: SettleService,
   rebalance: RebalanceService,
+  execution: ExecutionService,
 ): Hono {
   const app = new Hono();
 
@@ -134,7 +136,18 @@ export function positionsRoutes(
       targetUsd: parsed.data.targetUsd,
     });
     if (!result.ok) return sendError(c, result.error);
-    return c.json(result.value);
+
+    // If a top-up is needed, queue it for the execution node to sign + submit.
+    let intentId: string | null = null;
+    if (result.value.intent) {
+      intentId = execution.enqueue({
+        positionId: id,
+        kind: result.value.intent.kind,
+        market: result.value.intent.market,
+        params: { amountUsd: result.value.intent.amountUsd },
+      }).id;
+    }
+    return c.json({ ...result.value, intentId });
   });
 
   return app;

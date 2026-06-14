@@ -33,6 +33,21 @@ CREATE TABLE IF NOT EXISTS position_events (
 );
 
 CREATE INDEX IF NOT EXISTS idx_events_position ON position_events(position_id);
+
+CREATE TABLE IF NOT EXISTS execution_intents (
+  id TEXT PRIMARY KEY,
+  position_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  market TEXT NOT NULL,
+  params TEXT,
+  status TEXT NOT NULL,
+  tx_hash TEXT,
+  error TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_intents_status ON execution_intents(status);
 `;
 
 /** Open (or create) the SQLite db, ensure the schema, and return a Drizzle handle. */

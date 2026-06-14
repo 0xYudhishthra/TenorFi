@@ -28,6 +28,8 @@ export interface TransitionMeta {
   detail?: unknown;
 }
 
+export type EventListener = (event: PositionEvent) => void;
+
 export interface PositionService {
   /** Create a position from a fresh quote: DRAFT → QUOTED, both recorded. */
   openHedge(input: OpenHedgeInput): Result<HedgePosition, KeelError>;
@@ -40,25 +42,37 @@ export interface PositionService {
     to: PositionStatus,
     meta?: TransitionMeta,
   ): Result<HedgePosition, KeelError>;
+  /** Append a timeline event without a state change (e.g. an execution result). */
+  note(
+    positionId: string,
+    meta: { type: string; txHash?: string; signer?: string; detail?: unknown },
+  ): PositionEvent;
+  /** Subscribe to a position's live events. Returns an unsubscribe fn. */
+  subscribe(positionId: string, listener: EventListener): () => void;
 }
 
 export function createPositionService(repo: PositionRepo): PositionService {
+  const listeners = new Map<string, Set<EventListener>>();
+
+  function publish(event: PositionEvent) {
+    const set = listeners.get(event.positionId);
+    if (set) for (const l of set) l(event);
+  }
+
   return {
     openHedge(input) {
       const pos = repo.create({ ...input, status: "DRAFT" });
-      repo.appendEvent({
-        positionId: pos.id,
-        type: "created",
-        toStatus: "DRAFT",
-      });
+      publish(repo.appendEvent({ positionId: pos.id, type: "created", toStatus: "DRAFT" }));
       // We already hold a quote, so advance to QUOTED immediately.
       repo.updateStatus(pos.id, "QUOTED", Date.now());
-      repo.appendEvent({
-        positionId: pos.id,
-        type: "transition",
-        fromStatus: "DRAFT",
-        toStatus: "QUOTED",
-      });
+      publish(
+        repo.appendEvent({
+          positionId: pos.id,
+          type: "transition",
+          fromStatus: "DRAFT",
+          toStatus: "QUOTED",
+        }),
+      );
       return ok({ ...pos, status: "QUOTED" });
     },
 
@@ -94,16 +108,43 @@ export function createPositionService(repo: PositionRepo): PositionService {
       }
       const at = Date.now();
       repo.updateStatus(id, to, at);
-      repo.appendEvent({
-        positionId: id,
-        type: meta?.type ?? "transition",
-        fromStatus: pos.status,
-        toStatus: to,
-        txHash: meta?.txHash,
-        signer: meta?.signer,
-        detail: meta?.detail,
-      });
+      publish(
+        repo.appendEvent({
+          positionId: id,
+          type: meta?.type ?? "transition",
+          fromStatus: pos.status,
+          toStatus: to,
+          txHash: meta?.txHash,
+          signer: meta?.signer,
+          detail: meta?.detail,
+        }),
+      );
       return ok({ ...pos, status: to, updatedAt: at });
+    },
+
+    note(positionId, meta) {
+      const event = repo.appendEvent({
+        positionId,
+        type: meta.type,
+        txHash: meta.txHash,
+        signer: meta.signer,
+        detail: meta.detail,
+      });
+      publish(event);
+      return event;
+    },
+
+    subscribe(positionId, listener) {
+      let set = listeners.get(positionId);
+      if (!set) {
+        set = new Set();
+        listeners.set(positionId, set);
+      }
+      set.add(listener);
+      return () => {
+        set?.delete(listener);
+        if (set && set.size === 0) listeners.delete(positionId);
+      };
     },
   };
 }

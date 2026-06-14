@@ -4,25 +4,24 @@ import { createKeelComposeSdk, resolveUserProxy } from "./client.js";
 import { encodeKeelShipCall, KEEL_BASE } from "./keel.js";
 
 export interface KeelOpenParams {
-  /** The hedger's signer (EOA). Its Compose proxy becomes the Aqua maker. */
+  /**
+   * The LP / insurance reserve's signer (EOA). This flow is run BY THE LP to
+   * ship coverage: its Compose proxy becomes the Aqua `maker`.
+   */
   signer: `0x${string}`;
-  /** USDC collateral to lock for the Keel leg, 6-dec base units. Fixed at compile time. */
+  /** USDC collateral the LP/reserve ships for the Keel leg, 6-dec base units. Fixed at compile time. */
   collateral: bigint;
-  /** The bound counterparty for this leg (the insurance reserve). */
-  counterparty: `0x${string}`;
+  /** The hedger (the bound taker/subscriber): settles and posts zero collateral. */
+  subscriber: `0x${string}`;
   /** Locked fixed funding rate (FFR), per-period in WAD. Signed. */
   fixedRate: bigint;
   /** Per-period clamp (e.g. 4e16 = 4%). */
   cap: bigint;
   /** Notional in USDC 6-dec base units. */
   notional: bigint;
-  /**
-   * true: maker (the hedger here) pays when realized > fixed; false: pays when
-   * realized < fixed. The hedger's downside leg is `false` (hedger pays the
-   * reserve the premium when funding stays calm).
-   */
-  makerPaysAbove?: boolean;
-  /** Override the resolved proxy/maker (skips the probe round-trip). */
+  /** Settlement token. Defaults to USDC (`KEEL_BASE.usdc`). */
+  settlementToken?: `0x${string}`;
+  /** Override the resolved proxy/maker (skips the probe round-trip). The LP proxy = Aqua maker. */
   maker?: `0x${string}`;
   periodSeconds?: bigint;
   program?: `0x${string}`;
@@ -36,13 +35,15 @@ export interface KeelOpenParams {
 }
 
 /**
- * Build + compile the Composer flow that opens a Keel position on Base.
+ * Build + compile the Composer flow that SHIPS a Keel position on Base. This is
+ * the LP-ship flow: it is run BY THE LP / insurance reserve to ship coverage.
  *
- * The flow runs on the hedger's per-user Compose proxy (the `userProxy`): it
- * pulls a fixed USDC collateral in, approves Aqua to pull it at settlement, and
- * ships the funding-settlement order into Aqua via `core.rawCall` (the order's
- * array args can't go through the typed `core.call`, so the calldata is
- * pre-encoded off-chain).
+ * The flow runs on the LP's per-user Compose proxy (the `userProxy`), which
+ * becomes the Aqua `maker`: it pulls a fixed USDC collateral in, approves Aqua
+ * to pull it at settlement, and ships the funding-settlement order into Aqua via
+ * `core.rawCall` (the order's array args can't go through the typed `core.call`,
+ * so the calldata is pre-encoded off-chain). The hedger is the `subscriber` —
+ * they post zero collateral and only activate the subscription separately.
  *
  * Aqua's `ship` only records the maker's virtual balance — it never pulls the
  * USDC — so the collateral must stay on the proxy for per-period settlement to
@@ -50,12 +51,13 @@ export interface KeelOpenParams {
  * we consume the collateral with a `core.split`: its (unbound) halves become
  * residual that, with no `sweepTo`, stays on the proxy as the live Aqua balance.
  *
- * Opening a position = a single signed transaction (`result.transactionRequest`).
+ * Shipping a position = a single signed transaction (`result.transactionRequest`).
  */
 export async function buildKeelOpenFlow(params: KeelOpenParams): Promise<ComposeCompileResult> {
   const sdk = params.sdk ?? createKeelComposeSdk();
   const usdc = (params.usdc ?? KEEL_BASE.usdc) as `0x${string}`;
 
+  // maker = the LP/reserve proxy (this flow is run by the LP).
   const maker =
     params.maker ??
     (await resolveUserProxy({ signer: params.signer, chainId: KEEL_BASE.chainId, token: usdc, sdk }));
@@ -63,11 +65,11 @@ export async function buildKeelOpenFlow(params: KeelOpenParams): Promise<Compose
   const ship = await encodeKeelShipCall({
     order: {
       maker,
-      counterparty: params.counterparty,
+      subscriber: params.subscriber,
+      settlementToken: params.settlementToken,
       fixedRate: params.fixedRate,
       cap: params.cap,
       notional: params.notional,
-      makerPaysAbove: params.makerPaysAbove ?? false,
       program: params.program,
       fundingIndex: params.fundingIndex,
       periodSeconds: params.periodSeconds,

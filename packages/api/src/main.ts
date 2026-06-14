@@ -38,11 +38,10 @@ const reserve =
 const db = createDb(config.DATABASE_PATH);
 
 const funding = createFundingService({ transport });
-// Onboarding legs: Base/Keel leg via LI.FI Composer, HL leg via LI.FI classic.
+// Onboarding legs: Base/Keel ACTIVATE leg via LI.FI Composer (hedger approves
+// Aqua, no ship), HL leg via LI.FI classic. The LP-ship flow is not part of /hedge.
 const hedge = createHedgeService({
   keelChain: CHAINS.base,
-  reserve,
-  rpcUrl: config.BASE_RPC_URL,
 });
 const positions = createPositionService(createPositionRepo(db));
 const settle = createSettleService(funding, { keelTarget });

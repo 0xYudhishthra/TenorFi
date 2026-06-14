@@ -14,6 +14,7 @@
 export * from "./client.js";
 export * from "./keel.js";
 export * from "./open.js";
+export * from "./activate.js";
 export * from "./deposit.js";
 export * from "./hedge.js";
 export * from "./execute.js";

@@ -16,20 +16,26 @@ export const KEEL_BASE = {
   periodSeconds: 3600,
 } as const;
 
-/** Inputs to `KeelFundingProgram.buildProgram` — the maker's funding-settlement order. */
+/** Inputs to `TenorFundingProgram.buildProgram` — the maker's funding-settlement order. */
 export interface KeelOrderParams {
-  /** The payer/owner of this leg. With Composer this is the user's execution proxy. */
+  /**
+   * The LP / insurance reserve: ships coverage and is paid the premium. With
+   * Composer this is the LP's execution proxy (the Aqua `maker`).
+   */
   maker: `0x${string}`;
-  /** The only address allowed to take this order (the receiver of this leg). */
-  counterparty: `0x${string}`;
+  /**
+   * The hedger (the bound taker): settles, posts ZERO collateral, and only
+   * approves USDC to Aqua so the premium can be pulled.
+   */
+  subscriber: `0x${string}`;
   /** Locked fixed funding rate (FFR), per-period in WAD. Signed. */
   fixedRate: bigint;
   /** Per-period clamp (e.g. 4e16 = 4%). */
   cap: bigint;
   /** Notional in USDC 6-decimal base units. */
   notional: bigint;
-  /** true: maker pays when realized > fixed; false: when realized < fixed. */
-  makerPaysAbove: boolean;
+  /** Settlement token. Defaults to USDC (`KEEL_BASE.usdc`). */
+  settlementToken?: `0x${string}`;
   program?: `0x${string}`;
   fundingIndex?: `0x${string}`;
   periodSeconds?: bigint;
@@ -47,8 +53,8 @@ const BUILD_PROGRAM_ABI = [
       { name: "cap", type: "uint256" },
       { name: "notional", type: "uint256" },
       { name: "periodSeconds", type: "uint256" },
-      { name: "counterparty", type: "address" },
-      { name: "makerPaysAbove", type: "bool" },
+      { name: "subscriber", type: "address" },
+      { name: "settlementToken", type: "address" },
     ],
     outputs: [],
   },
@@ -97,8 +103,8 @@ export async function buildKeelOrderStrategy(
       params.cap,
       params.notional,
       params.periodSeconds ?? BigInt(KEEL_BASE.periodSeconds),
-      params.counterparty,
-      params.makerPaysAbove,
+      params.subscriber,
+      params.settlementToken ?? KEEL_BASE.usdc,
     ],
   });
   const res = await publicClient.call({ to: program, data });
@@ -132,6 +138,12 @@ export async function encodeKeelShipCall(params: {
   usdc?: `0x${string}`;
   publicClient?: PublicClient;
 }): Promise<KeelShipCall> {
+  // No-default rule: the reserve must ship collateral >= cap*notional/1e18.
+  const floor = (params.order.cap * params.order.notional) / 10n ** 18n;
+  if (params.collateral < floor) {
+    throw new Error("collateral below cap*notional floor (no-default)");
+  }
+
   const strategy = await buildKeelOrderStrategy(params.order, params.publicClient);
   const router = params.router ?? KEEL_BASE.router;
   const positionToken = params.positionToken ?? KEEL_BASE.positionToken;

@@ -17,15 +17,15 @@ export default function Header() {
         style={{ display: "inline-flex", alignItems: "center", gap: 10 }}
       >
         <Image
-          src="/keel_logo.png"
-          alt="Keel"
+          src="/tenorfi_logo.png"
+          alt="TenorFi"
           width={132}
           height={261}
           priority
           className="brand-logo"
           style={{ height: 30, width: "auto", flex: "none" }}
         />
-        <span style={{ lineHeight: 1 }}>Keel</span>
+        <span style={{ lineHeight: 1 }}>TenorFi</span>
       </Link>
 
       <div className="nav-links">

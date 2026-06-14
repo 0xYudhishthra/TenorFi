@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Explorer — Keel",
+  title: "Explorer — TenorFi",
   description:
-    "Search positions, addresses, and settlement transactions on the Keel funding-rate protocol.",
+    "Search positions, addresses, and settlement transactions on the TenorFi funding-rate protocol.",
 };
 
 export default function ExplorerLayout({

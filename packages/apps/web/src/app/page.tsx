@@ -38,7 +38,7 @@ export default function Home() {
                 <span className="eyebrow">In one conversation</span>
                 <h2 className="display">Create a position.</h2>
                 <p className="lead" style={{ marginTop: 14, maxWidth: "40ch" }}>
-                  Tell the Keel agent what you want. It assembles both legs of the hedge —
+                  Tell the TenorFi agent what you want. It assembles both legs of the hedge —
                   you confirm with a single signature.
                 </p>
                 <div className="create-steps">
@@ -83,7 +83,7 @@ export default function Home() {
                     <b>You:</b> Create a long on BTC and fix the funding rate.
                   </div>
                   <div className="q" style={{ marginTop: 10 }}>
-                    <b>Keel:</b> Here are 3 standing offers. Pick one to lock.
+                    <b>TenorFi:</b> Here are 3 standing offers. Pick one to lock.
                   </div>
                 </div>
                 <div style={{ display: "grid", gap: 10 }}>
@@ -142,7 +142,7 @@ export default function Home() {
               <div className="num">01</div>
               <h3>Connect the agent</h3>
               <p>
-                Connect Keel&rsquo;s MCP to Claude, Cursor, or Cline. No dashboards to learn
+                Connect TenorFi&rsquo;s MCP to Claude, Cursor, or Cline. No dashboards to learn
                 — you talk to it.
               </p>
             </Reveal>
@@ -175,7 +175,7 @@ export default function Home() {
             </svg>
             <div style={{ fontSize: "14.5px", color: "var(--fg-secondary)" }}>
               <b style={{ color: "var(--fg-primary)" }}>At the brink:</b> if collateral runs
-              low, Keel doesn&rsquo;t close blindly. The agent prepares the call —{" "}
+              low, TenorFi doesn&rsquo;t close blindly. The agent prepares the call —{" "}
               <b style={{ color: "var(--fg-primary)" }}>you</b> confirm close, re-match, or
               add collateral. Agent proposes, human decides.
             </div>
@@ -218,7 +218,7 @@ export default function Home() {
               <div className="node node-core">
                 <div className="k">The engine</div>
                 <div className="t" style={{ fontSize: 22, color: "#fff" }}>
-                  Keel on 1inch Aqua
+                  TenorFi on 1inch Aqua
                 </div>
                 <div className="d">
                   A custom{" "}
@@ -247,7 +247,7 @@ export default function Home() {
                 </div>
                 <div className="node">
                   <div className="k">Counterparty</div>
-                  <div className="t">Keel LP</div>
+                  <div className="t">TenorFi LP</div>
                   <div className="d">
                     Stands as the always-on rate-offerer so you lock instantly.
                   </div>
@@ -332,7 +332,7 @@ export default function Home() {
           <Reveal className="faq">
             <Faq
               q="Is my collateral locked away?"
-              a="No. Keel is non-custodial. Your collateral stays live in your wallet as an Aqua virtual balance while it backs the position. Strips and IPOR lock collateral dead for weeks — Keel keeps it working."
+              a="No. TenorFi is non-custodial. Your collateral stays live in your wallet as an Aqua virtual balance while it backs the position. Strips and IPOR lock collateral dead for weeks — TenorFi keeps it working."
               open
             />
             <Faq
@@ -341,7 +341,7 @@ export default function Home() {
             />
             <Faq
               q="Hedger or LP — which am I?"
-              a="If you hold a perp and want certainty, you're the hedger — you pay fixed and receive floating, cancelling your variable funding. The Keel LP is the standing counterparty so you can lock instantly without waiting for a match."
+              a="If you hold a perp and want certainty, you're the hedger — you pay fixed and receive floating, cancelling your variable funding. The TenorFi LP is the standing counterparty so you can lock instantly without waiting for a match."
             />
             <Faq
               q="Which chains and assets?"

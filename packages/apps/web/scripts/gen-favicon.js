@@ -1,11 +1,11 @@
-/* Generate public/favicon.ico from public/keel_logo.png — pure Node, no deps.
+/* Generate public/favicon.ico from public/tenorfi_logo.png — pure Node, no deps.
    Decodes the (8-bit RGBA, non-interlaced) PNG, fits it onto a centered
    256x256 transparent canvas, re-encodes as PNG, and wraps it in an ICO. */
 const fs = require("fs");
 const zlib = require("zlib");
 const path = require("path");
 
-const SRC = path.join(__dirname, "..", "public", "keel_logo.png");
+const SRC = path.join(__dirname, "..", "public", "tenorfi_logo.png");
 const OUT = path.join(__dirname, "..", "public", "favicon.ico");
 const SIZE = 256; // square canvas
 const PAD = 12; // transparent margin

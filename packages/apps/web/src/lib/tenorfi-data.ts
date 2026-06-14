@@ -1,6 +1,6 @@
 /* ============================================================================
-   KEEL — mock data + formatting helpers (explorer / create-position)
-   Ported from the design bundle's keel-data.js. All data is illustrative;
+   TENORFI — mock data + formatting helpers (explorer / create-position)
+   Ported from the design bundle's tenorfi-data.js. All data is illustrative;
    addresses & hashes are valid-shaped but fake. Deterministic (SSR-safe).
    NOTE: user-facing label for a position record is "Position" (never "swap").
    ============================================================================ */

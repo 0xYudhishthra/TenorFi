@@ -1,4 +1,4 @@
-// Smart search classifier for the Keel explorer.
+// Smart search classifier for the TenorFi explorer.
 // Mirrors how Etherscan / Solscan / Basescan auto-detect the kind of query
 // (address vs. transaction vs. block) and route to the right results page.
 

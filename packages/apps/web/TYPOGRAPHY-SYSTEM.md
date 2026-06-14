@@ -1,4 +1,4 @@
-# Keel Typography System
+# TenorFi Typography System
 
 All-sans type. **Mono is reserved for live / changing numbers only.** Fonts are
 **self-hosted** with plain CSS `@font-face` (served from `/public/fonts`) — no

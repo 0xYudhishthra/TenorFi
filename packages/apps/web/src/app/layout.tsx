@@ -7,17 +7,17 @@ import Footer from "@/components/shared/Footer";
 // /public/fonts/*.woff2 — no next/font, no build-time fetch, no hashed classes.
 
 export const metadata: Metadata = {
-  title: "Keel — Lock Your Funding Rate",
+  title: "TenorFi — Lock Your Funding Rate",
   description: "On-chain fixed funding-rate positions. Your collateral never goes idle.",
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
-      { url: "/keel_logo.png", type: "image/png" },
+      { url: "/tenorfi_logo.png", type: "image/png" },
     ],
     apple: "/favicon.ico",
   },
   openGraph: {
-    title: "Keel — Lock Your Funding Rate",
+    title: "TenorFi — Lock Your Funding Rate",
     description: "On-chain fixed funding-rate positions. Your collateral never goes idle.",
     images: ["/og-image.png"],
   },

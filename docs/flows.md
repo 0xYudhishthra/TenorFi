@@ -32,7 +32,7 @@ speculators provide it.)*
 | **Keel MCP** | The front door. Reads funding, lists offers, builds the transactions. *Proposes; the human confirms.* |
 | **LI.FI Composer** | The on-ramp. Brings the user's USDC cross-chain and opens **both legs** of the hedge in one Flow. |
 | **Hyperliquid** | Where the real perp lives (leg 1). Also the **funding-rate data source** (read by Chainlink). |
-| **Keel contracts** (Base mainnet) | The insurance policy (leg 2): `KeelSwap` / the `_fundingSettle` Aqua opcode. Custody + settlement only. |
+| **Keel contracts** (Base mainnet) | The insurance policy (leg 2): the `_fundingSettle` Aqua opcode (`KeelSwapVMRouter` + `KeelFundingProgram`). Matching + settlement only — no custody (collateral stays in-wallet as Aqua virtual balances). |
 | **1inch Aqua / SwapVM** | The settlement engine. The collateral lives as **virtual balances**, so it keeps earning yield while it backs the policy. |
 | **Chainlink CRE** | The thermometer. Reads Hyperliquid funding → DON consensus → writes it on-chain. |
 | **Insurance reserve** | The protocol's pre-funded counterparty that pays claims and collects premiums. In the MVP, a **pre-funded team wallet**. |
@@ -92,7 +92,7 @@ signature. *Agent proposes, the human decides.*
 flowchart TB
     AGENT["User + agent → Keel MCP<br/>'long BTC $5k + fix funding' → pick 5% offer → sign once"] --> FLOW["LI.FI Composer Flow<br/>(cross-chain USDC, one signature)"]
     FLOW --> HL["Deposit collateral → Hyperliquid (HyperCore)<br/>MCP fires the perp order via HL API"]
-    FLOW --> KEEL["Open the Keel policy<br/>KeelSwap.open / Aqua ship"]
+    FLOW --> KEEL["Open the Keel policy<br/>ship both legs into Aqua"]
     KEEL --> AQUA["Collateral held as Aqua virtual balances<br/>→ keeps earning yield while it insures"]
 ```
 
@@ -161,9 +161,9 @@ So if one side is ever drained, **only that side closes — the other is paid in
 - **Read:** `get_funding(market)` (AFR via Chainlink), `list_offers()` (the insurer's fixed-rate offers),
   `get_position(addr)`, `preview_settle(swapId, realized)`.
 - **Open (user-signed):** `open_hyperliquid_position(market, side, size)` (HL API) +
-  `open_keel_position(offerId)` (`KeelSwap.open`).
-- **Settle (routine, keeper/agent):** `settle(swapId, period)` → on `AFR > FFR`,
-  `topup_hyperliquid_margin(...)`.
+  `open_keel_position(offerId)` (approve Aqua + `ship` the leg via `KeelFundingProgram`/`KeelSwapVMRouter`).
+- **Settle (routine, keeper/agent):** the bound taker calls `KeelSwapVMRouter.swap` over the shipped
+  order for the period → on `AFR > FFR`, `topup_hyperliquid_margin(...)`.
 - **Gated (brink, user-confirmed):** `propose_decision(swapId)` → returns the *unsigned* close / top-up /
   re-match tx for the user to confirm.
 

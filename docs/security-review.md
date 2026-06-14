@@ -43,7 +43,7 @@ Chain: **Base mainnet** (chain id 8453).
   not reverted (can't brick the forwarder).
 - **No double-settle:** the opcode guards `(orderHash, period)` (skipped during static quoting).
 - **Protocol neutrality:** the contracts only match + settle (no house position; no custody — collateral
-  stays in each party's wallet as an Aqua virtual balance); the LP provides liquidity and bears the
+  stays in each party's wallet as an Aqua virtual balance); the insurance reserve provides liquidity and bears the
   bounded directional risk.
 
 ## Deep audit pass (solidity-auditor, 4 vector agents + adversarial) — findings & resolutions
@@ -53,7 +53,7 @@ happy-path fork test missed. All actionable findings are now fixed; tests added 
 
 | # | Sev | Finding | Resolution |
 |---|---|---|---|
-| A | High | **Any address could take the settlement order and steal the LP's payout** (order not bound to the counterparty) | **Fixed** — `_fundingSettle` binds the order to a `counterparty` and reverts `UnauthorizedTaker` if `ctx.query.taker != counterparty`. Test: `test_strangerCannotTake`. |
+| A | High | **Any address could take the settlement order and steal the reserve's payout** (order not bound to the counterparty) | **Fixed** — `_fundingSettle` binds the order to a `counterparty` and reverts `UnauthorizedTaker` if `ctx.query.taker != counterparty`. Test: `test_strangerCannotTake`. |
 | B | High | **Opcode dropped the sign of `R − F`** → maker paid in both directions / drainable | **Fixed** — settlement is now directional: each leg has `makerPaysAbove`; an order pays only in its own direction (0 otherwise). A Keel position is two mirror orders. Tests: `test_wrongDirection_paysZero`, `test_makerPaysBelow_RBelowF_pays`. |
 | 1 | Med-High | **USDC blacklisting locks all collateral in `KeelSwap.close()`** | **Resolved by removal** — `KeelSwap` deleted; the Aqua path never custodies collateral (virtual balances stay in the owner's wallet), so there is no pooled `close()` to block. |
 | 4 | Med | **Early `KeelSwap.close()` skips unsettled periods** | **Resolved by removal** — `KeelSwap` deleted. On the Aqua path each period is an independent shipped-order settlement; closing = stop shipping / withdraw the remaining virtual balance. |
@@ -62,9 +62,9 @@ happy-path fork test missed. All actionable findings are now fixed; tests added 
 | 7 | Low | **`setForwarder(0)` bricks funding writes** | **Fixed** — zero-address check added in `FundingIndex.setForwarder` (still in scope). |
 | 8 | Low | **Bare `require` on transfer (non-standard ERC20)** | **Resolved by removal** — the bare transfers were in `KeelSwap` (deleted). The Aqua path uses Aqua's own token movement; Base USDC returns `bool` and behaves standardly. |
 
-**Test count after fixes + KeelSwap removal: 35** (33 offline + 2 Base-mainnet fork). Covers: directional settlement, taker-bind, stranger-cannot-take, clamp-to-cap, double-settle, no-default on the Aqua path (ship-floor covers the worst case; underfunded period reverts), and the two-leg mirror settlement (R<F hedger-pays-LP) end-to-end on real Aqua.
+**Test count after fixes + KeelSwap removal: 35** (33 offline + 2 Base-mainnet fork). Covers: directional settlement, taker-bind, stranger-cannot-take, clamp-to-cap, double-settle, no-default on the Aqua path (ship-floor covers the worst case; underfunded period reverts), and the two-leg mirror settlement (R<F hedger-pays-reserve) end-to-end on real Aqua.
 
 ## Known limitations / out of scope
 - **Oracle staleness / liveness** — if CRE/relayer stops writing, settlement halts for that period (funds safe; not lost). The receiver's relayer fallback mitigates liveness.
-- **LP directional risk** — real but bounded per period; this is the protocol's economic design, not a bug.
+- **Insurance reserve directional risk** — real but bounded per period; this is the protocol's economic design, not a bug.
 - A formal external audit has **not** been performed; this is an internal review for a hackathon build.

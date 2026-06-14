@@ -18,7 +18,7 @@ flowchart LR
     LIFI["LI.FI Composer<br/>cross-chain USDC in"] --> KEEL
     CRE["Chainlink CRE<br/>Hyperliquid funding → KeystoneForwarder → KeelFundingReceiver.onReport → on-chain"] -->|funding index| KEEL
     KEEL["1inch Aqua / SwapVM<br/>_fundingSettle opcode settles each period"]
-    KEEL -->|USDC| OUT["hedger ↔ LP"]
+    KEEL -->|USDC| OUT["hedger ↔ reserve"]
 ```
 
 ---

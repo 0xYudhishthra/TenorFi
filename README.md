@@ -18,8 +18,8 @@ Perpetual-futures *funding* is the floating fee traders pay or earn every hour. 
 Keel is a funding-rate swap: **variable → fixed**. It never touches your Hyperliquid position — it settles against a *public number* (the funding rate, read by Chainlink CRE), like rain insurance pays on rainfall without controlling the weather.
 
 - **Hedger (the customer / taker)** — a leveraged perp long. Pays fixed, receives floating → their variable funding is cancelled, leaving a flat locked rate. Takes our offer in one click.
-- **Keel LP (us / maker)** — quotes a consistent fixed rate and stands as the counterparty, so a hedger locks instantly. Receives fixed, pays floating; earns the premium when funding stays calm, pays out (bounded per period) when it spikes.
-- **The protocol stays neutral** — the contract only custodies and settles; the LP provides the liquidity, exactly as an exchange is neutral while market-makers quote. *(Speculators that take the LP's side are phase 2.)*
+- **Insurance reserve (us / maker)** — quotes a consistent fixed rate and stands as the counterparty, so a hedger locks instantly. Receives fixed, pays floating; earns the premium when funding stays calm, pays out (bounded per period) when it spikes.
+- **The protocol stays neutral** — the contract only custodies and settles; the reserve provides the liquidity, exactly as an exchange is neutral while market-makers quote. *(Speculators that take the reserve's side are phase 2.)*
 
 ## How the swap works
 
@@ -27,8 +27,8 @@ Each period, the two legs exchange the fixed-vs-realized-floating difference fro
 
 ```
 net = clamp(realized − fixed, ±cap) × notional       (credit to the hedger)
-  realized > fixed  → hedger receives, LP pays        (funding spiked — the payout that hedges the perp)
-  realized < fixed  → hedger pays, LP receives        (the premium for certainty)
+  realized > fixed  → hedger receives, reserve pays   (funding spiked — the payout that hedges the perp)
+  realized < fixed  → hedger pays, reserve receives   (the premium for certainty)
 ```
 
 **No default, by design:** funding is capped per period, and each side pre-locks at least one period's worst case (`cap × notional`). The most anyone can owe in a period is already paid up front; if a side is drained, only that side closes and the counterparty is paid in full.
@@ -51,11 +51,11 @@ When a side's collateral can no longer cover one more worst-case period (`remain
 ```mermaid
 flowchart TB
     HEDGER["Hedger / taker"] -->|takes our rate| KEEL
-    LP["Keel LP / maker — quotes the fixed rate"] --> KEEL
+    RESERVE["Insurance reserve / maker — quotes the fixed rate"] --> KEEL
     CRE["Chainlink CRE<br/>Hyperliquid funding → DON → KeystoneForwarder → KeelFundingReceiver.onReport"] -->|funding index| KEEL
     LIFI["LI.FI Composer<br/>USDC collateral, cross-chain"] --> KEEL
     KEEL["KEEL swap — 1inch Aqua / SwapVM (Base mainnet)<br/>custom _fundingSettle opcode · collateral stays live via Aqua virtual balances"]
-    KEEL -->|settle / payout USDC| OUT["Hedger ↔ LP via Aqua virtual balances"]
+    KEEL -->|settle / payout USDC| OUT["Hedger ↔ reserve via Aqua virtual balances"]
     KEEL -.->|collateral-low| BRINK["User confirms via MCP<br/>close / re-match / continue"]
 ```
 
@@ -65,7 +65,7 @@ flowchart TB
 flowchart TB
     A["Hyperliquid BTC funding (hourly — the public number)"] -->|"CRE: fetch → DON → KeystoneForwarder → KeelFundingReceiver.onReport"| B["FundingIndex.setFundingIndex(period, R)<br/>on Base mainnet"]
     B -->|"keeper fires settle each period"| C["_fundingSettle opcode (over Aqua)<br/>net = clamp(R − F, ±cap) × N"]
-    C --> D["USDC moves hedger ↔ LP via Aqua virtual balances<br/>(collateral never locked)"]
+    C --> D["USDC moves hedger ↔ reserve via Aqua virtual balances<br/>(collateral never locked)"]
 ```
 
 ## Status

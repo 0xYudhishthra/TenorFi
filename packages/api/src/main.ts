@@ -29,10 +29,21 @@ const config = loadConfig();
 
 const transport = createTransport(config.HL_NETWORK);
 const keelTarget = config.KEELSWAP_ADDRESS_BASE as `0x${string}` | undefined;
+const keeperKey = config.KEEPER_PRIVATE_KEY as `0x${string}` | undefined;
+// The insurance reserve = the Composer open leg's bound counterparty AND the
+// on-chain settler's maker. Defaults to the keeper's own address when not set.
+const reserve =
+  (config.RESERVE_ADDRESS as `0x${string}` | undefined) ??
+  (keeperKey ? privateKeyToAddress(keeperKey) : undefined);
 const db = createDb(config.DATABASE_PATH);
 
 const funding = createFundingService({ transport });
-const hedge = createHedgeService({ keelChain: CHAINS.base, keelTarget });
+// Onboarding legs: Base/Keel leg via LI.FI Composer, HL leg via LI.FI classic.
+const hedge = createHedgeService({
+  keelChain: CHAINS.base,
+  reserve,
+  rpcUrl: config.BASE_RPC_URL,
+});
 const positions = createPositionService(createPositionRepo(db));
 const settle = createSettleService(funding, { keelTarget });
 const rebalance = createRebalanceService({ transport });
@@ -40,11 +51,7 @@ const execution = createExecutionService(createExecutionRepo(db), positions);
 
 // On-chain settler: drives the proven Ship/Settle forge scripts. Dry-run by
 // default — only broadcasts when KEEPER_PRIVATE_KEY + BASE_RPC_URL are present
-// AND SETTLE_BROADCAST=true. The reserve defaults to the keeper's own address.
-const keeperKey = config.KEEPER_PRIVATE_KEY as `0x${string}` | undefined;
-const reserve =
-  (config.RESERVE_ADDRESS as `0x${string}` | undefined) ??
-  (keeperKey ? privateKeyToAddress(keeperKey) : undefined);
+// AND SETTLE_BROADCAST=true. Reuses the `reserve` resolved above as the maker.
 const onchain = createOnchainSettleService({
   rpcUrl: config.BASE_RPC_URL,
   keeperKey,

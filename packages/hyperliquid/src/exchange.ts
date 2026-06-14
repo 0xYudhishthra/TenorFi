@@ -130,6 +130,43 @@ export async function topUpMargin(params: {
   });
 }
 
+/**
+ * Open a leveraged long in one call: set leverage, then market-buy `usdNotional`
+ * worth of the market at the current mark. The customer's hedge leg in Keel.
+ */
+export async function openPerpLong(params: {
+  market: string;
+  usdNotional: number;
+  leverage: number;
+  isCross?: boolean;
+  slippage?: number;
+  client?: ExchangeClient;
+  transport?: HttpTransport;
+}) {
+  const transport = params.transport ?? createTransport();
+  const client = params.client ?? createExchangeClient(undefined, undefined, transport);
+  await updateLeverage({
+    market: params.market,
+    leverage: params.leverage,
+    isCross: params.isCross,
+    client,
+    transport,
+  });
+  const info = new InfoClient({ transport });
+  const [meta, ctxs] = await info.metaAndAssetCtxs();
+  const index = meta.universe.findIndex((u) => u.name === params.market);
+  if (index < 0) throw new Error(`market not found on Hyperliquid: ${params.market}`);
+  const mark = Number(ctxs[index]!.markPx);
+  return placePerpOrder({
+    market: params.market,
+    isBuy: true,
+    size: params.usdNotional / mark,
+    slippage: params.slippage,
+    client,
+    transport,
+  });
+}
+
 /** Close an open position with a reduce-only market order on the opposite side. */
 export async function closePosition(params: {
   market: string;

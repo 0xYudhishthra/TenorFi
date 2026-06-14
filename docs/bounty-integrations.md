@@ -5,11 +5,11 @@
 > **Target bounties: 1inch · Chainlink · LI.FI.** Deploy chain: **Base mainnet.** Funding data
 > source: **Hyperliquid** (read by CRE).
 >
-> ⚠️ **Design direction:** TenorFi is moving to a **subscription** model — the user posts **no collateral**;
-> 1inch Aqua pulls a **fixed premium** from their wallet just-in-time each period, and the reserve covers
-> their actual funding (see [`flows.md`](flows.md)). The **deployed** opcode shown below still settles the
-> **net** `(R − F)` from **pre-shipped Aqua balances** — economically identical per period; the
-> premium-pull split is the migration. The code in this doc reflects what's **live**.
+> ✅ **Model (live & deployed):** TenorFi is a **subscription** — the subscriber posts **no collateral**.
+> A **single** SwapVM order settles both directions each period: when funding is **below** the fixed rate
+> the opcode pulls the **premium straight from the subscriber's wallet** just-in-time (`amountIn`), and
+> when funding is **above** it the reserve **covers** the gap from its shipped Aqua balance (`amountOut`)
+> (see [`flows.md`](flows.md)). The code in this doc reflects what's **live** on Base mainnet.
 
 ## Summary
 
@@ -46,9 +46,9 @@ canonical Aqua. Pull Aqua out and there is no settlement venue. Real USDC moves 
 both a Base-mainnet fork and the live deployment.
 
 **Link to the line of code:**
-- Custom opcode: `https://github.com/0xYudhishthra/TenorFi/blob/main/packages/contracts/src/swapvm/FundingSettle.sol#L53`
+- Custom opcode: `https://github.com/0xYudhishthra/TenorFi/blob/main/packages/contracts/src/swapvm/FundingSettle.sol#L66`
 - Opcode registration into Aqua's set: `https://github.com/0xYudhishthra/TenorFi/blob/main/packages/contracts/src/swapvm/TenorOpcodes.sol#L29`
-- Our SwapVM router (`Simulator, SwapVM, KeelOpcodes`): `https://github.com/0xYudhishthra/TenorFi/blob/main/packages/contracts/src/swapvm/TenorSwapVMRouter.sol#L15`
+- Our SwapVM router (`Simulator, SwapVM, TenorOpcodes`): `https://github.com/0xYudhishthra/TenorFi/blob/main/packages/contracts/src/swapvm/TenorSwapVMRouter.sol#L15`
 - Live on Base mainnet: router `0xba93ebc0A6a24980703423C3CE729F15eEDA099B`, program `0xd04Aa86aB1bd11834931b667f918B945f6556174` (Basescan-verified).
 
 **Ease of use (1–10): 6.** Aqua + SwapVM are powerful but the custom-opcode path is sparsely
@@ -109,41 +109,64 @@ sequenced calls were needed.)_
 
 **What we build.** A custom **SwapVM instruction `_fundingSettle`** that turns a swap into one
 period's funding settlement: it reads the latched funding rate, nets it against the locked fixed
-rate, clamps to the per-period cap, and writes the result to the swap's output register, so the
-router delivers `net` USDC from the payer (maker) to the receiver (taker). It is registered in our
-own router (`KeelSwapVMRouter`, which extends `AquaOpcodes` and appends the opcode) and exercised via
-a program built by `KeelFundingProgram`.
+rate, clamps to the per-period cap, and scales the per-hour net to the settlement window
+(`× periodSeconds / 3600`). It is registered in our own router (`TenorSwapVMRouter`, which extends
+`TenorOpcodes` → `AquaOpcodes` and appends the opcode) and exercised via a program built by
+`TenorFundingProgram`.
 
-SwapVM is one-directional (maker → taker), but a funding swap is two-sided, so a TenorFi position is
-**two mirror orders**: one pays the hedger when `realized > fixed` (`makerPaysAbove = true`), the
-mirror pays the reserve when `realized < fixed` (`makerPaysAbove = false`). Each order pays `0`
-outside its own direction (so a maker is never debited the wrong way) and is **bound to the agreed
-counterparty** — it reverts `UnauthorizedTaker` if anyone else tries to take it.
+SwapVM is one-directional (maker → taker), but a funding subscription is two-sided — so we settle it
+with a **single order** that computes a signed net and routes **either register**: when `realized > fixed`
+the reserve (maker) **covers** the gap via `amountOut` from its shipped Aqua balance; when
+`realized < fixed` the opcode sets `amountIn` and SwapVM pulls the **premium from the subscriber's
+wallet** just-in-time (with a 1-wei marker `amountOut`, since SwapVM requires the taker to receive
+something). One order works because `MakerTraits.validate` only requires `amountIn > 0 ||
+allowZeroAmountIn`. The order is **bound to one subscriber** (`taker = msg.sender`) — it reverts
+`UnauthorizedTaker` if anyone else tries to settle it, and each `(order, period)` settles once.
 
 > Canonical end-to-end flow (onboarding + per-period settlement, with diagrams): [`flows.md`](flows.md).
 
 ```mermaid
 flowchart TB
-    KEEPER["keeper / CRE trigger (per period)"] -->|swap| ROUTER["KeelSwapVMRouter (our SwapVM)"]
-    ROUTER -->|runs program| OP["_fundingSettle opcode<br/>amountOut = clamp(R − F, ±cap) × N"]
+    KEEPER["subscriber / keeper (per period)"] -->|swap| ROUTER["TenorSwapVMRouter (our SwapVM)"]
+    ROUTER -->|runs program| OP["_fundingSettle opcode<br/>net = clamp(R − F, ±cap) × N × periodSeconds/3600"]
     OP -->|reads| IDX["FundingIndex (R for the period)"]
-    ROUTER -->|"pull amountOut from maker(payer)"| AQUA["Aqua virtual balances"]
-    AQUA -->|deliver USDC| TAKER["receiver (taker)"]
+    OP -->|"R > F: coverage (amountOut)"| AQUA["Aqua virtual balances<br/>(reserve's shipped USDC)"]
+    AQUA -->|deliver USDC| SUB["subscriber (taker)"]
+    OP -->|"R < F: premium (amountIn)"| WALLET["subscriber's wallet"]
+    WALLET -->|transferFrom USDC| RESERVE["reserve"]
 ```
 
 **The opcode** (`packages/contracts/src/swapvm/FundingSettle.sol`):
 
 ```solidity
-function _fundingSettle(Context memory ctx, bytes calldata args) internal view {
-    (address fundingIndex, int256 fixedRate, uint256 cap, uint256 notional, uint256 periodSeconds) =
-        abi.decode(args, (address, int256, uint256, uint256, uint256));
+function _fundingSettle(Context memory ctx, bytes calldata args) internal {
+    (address fundingIndex, int256 fixedRate, uint256 cap, uint256 notional,
+     uint256 periodSeconds, address subscriber, address settlementToken) =
+        abi.decode(args, (address, int256, uint256, uint256, uint256, address, address));
 
-    uint256 period = block.timestamp / periodSeconds;            // derived on-chain; program stays fixed
+    if (ctx.query.taker != subscriber) revert UnauthorizedTaker();   // bound to its subscriber
+
+    uint256 period = block.timestamp / periodSeconds;                // derived on-chain; program stays fixed
     (int256 realized, bool isSet) = IFundingIndex(fundingIndex).getFundingIndex(period);
     require(isSet, FundingNotSet());
 
-    int256 diff = _clamp(realized - fixedRate, cap);             // clamp(R − F, ±cap)
-    ctx.swap.amountOut = (_abs(diff) * notional) / RATE_ONE;     // net: maker(payer) → taker(receiver)
+    if (!ctx.vm.isStaticContext) {                                   // once per (order, period)
+        if (settled[ctx.query.orderHash][period]) revert AlreadySettled();
+        settled[ctx.query.orderHash][period] = true;
+    }
+
+    int256 diff = _clamp(realized - fixedRate, cap);                 // clamp(R − F, ±cap), per-hour
+    int256 amt = (diff * int256(notional) * int256(periodSeconds))   // scale to this window
+        / (int256(RATE_ONE) * int256(FUNDING_PERIOD_SECONDS));       // (× periodSeconds / 3600)
+
+    if (amt > 0) {                                                   // R > F: reserve covers the gap
+        if (ctx.query.tokenOut != settlementToken) revert WrongToken();
+        ctx.swap.amountOut = uint256(amt);                          //   → paid to subscriber
+    } else if (amt < 0) {                                            // R < F: pull premium from wallet
+        if (ctx.query.tokenIn != settlementToken) revert WrongToken();
+        ctx.swap.amountIn = uint256(-amt);                          //   transferFrom subscriber → reserve
+        ctx.swap.amountOut = 1;                                     //   1-wei marker (SwapVM needs > 0)
+    }                                                               // amt == 0: nothing moves
 }
 ```
 

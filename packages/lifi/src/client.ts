@@ -31,3 +31,19 @@ export const USDC = {
   optimism: "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",
   hyperliquid: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
 } as const;
+
+/** USDC address for a known chain id. Throws for unknown chains — pass it explicitly. */
+export function usdcFor(chainId: number): string {
+  switch (chainId) {
+    case CHAINS.base:
+      return USDC.base;
+    case CHAINS.arbitrum:
+      return USDC.arbitrum;
+    case CHAINS.optimism:
+      return USDC.optimism;
+    case CHAINS.hyperliquid:
+      return USDC.hyperliquid;
+    default:
+      throw new Error(`no known USDC for chain ${chainId}; pass the token explicitly`);
+  }
+}

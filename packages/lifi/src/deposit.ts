@@ -1,5 +1,5 @@
 import { getQuote, type SDKClient } from "@lifi/sdk";
-import { CHAINS, createLifiClient, USDC } from "./client.js";
+import { CHAINS, createLifiClient, USDC, usdcFor } from "./client.js";
 
 export interface HyperCoreDepositParams {
   /** Source chain id to bring USDC from (e.g. CHAINS.arbitrum). */
@@ -13,20 +13,6 @@ export interface HyperCoreDepositParams {
   /** Slippage as a fraction (e.g. 0.005 = 0.5%). */
   slippage?: number;
   client?: SDKClient;
-}
-
-/** USDC address for a known source chain. */
-function usdcFor(chainId: number): string {
-  switch (chainId) {
-    case CHAINS.base:
-      return USDC.base;
-    case CHAINS.arbitrum:
-      return USDC.arbitrum;
-    case CHAINS.optimism:
-      return USDC.optimism;
-    default:
-      throw new Error(`no default USDC for chain ${chainId}; pass fromToken`);
-  }
 }
 
 /**

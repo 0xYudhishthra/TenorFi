@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import { Script } from "forge-std/Script.sol";
+import {Script} from "forge-std/Script.sol";
 
-import { FundingIndex } from "../src/FundingIndex.sol";
-import { KeelFundingReceiver } from "../src/KeelFundingReceiver.sol";
-import { MockUSDC } from "../test/mocks/MockUSDC.sol";
+import {FundingIndex} from "../src/FundingIndex.sol";
+import {KeelFundingReceiver} from "../src/KeelFundingReceiver.sol";
+import {MockUSDC} from "../test/mocks/MockUSDC.sol";
 
 /// @title DeployFunding — the CRE funding-write stack on Base mainnet
 /// @notice Deploys only the contracts on the Chainlink CRE write path (MockUSDC + FundingIndex +
@@ -53,8 +53,7 @@ contract DeployFunding is Script {
         vm.serializeAddress(k, "KeystoneForwarder", forwarder);
         vm.serializeAddress(k, "MockUSDC", address(d.usdc));
         vm.serializeAddress(k, "FundingIndex", address(d.fundingIndex));
-        string memory json =
-            vm.serializeAddress(k, "KeelFundingReceiver", address(d.receiver));
+        string memory json = vm.serializeAddress(k, "KeelFundingReceiver", address(d.receiver));
         vm.writeJson(json, "./deployments.json");
     }
 }

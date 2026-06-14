@@ -42,7 +42,7 @@ When a side's collateral can no longer cover one more worst-case period (`remain
 | Component | What it does | Where |
 |-----------|--------------|-------|
 | **1inch Aqua / SwapVM** | Custom `_fundingSettle` instruction settles a period as `amountOut = net`; collateral stays live via virtual balances | `packages/contracts/src/swapvm` |
-| **Chainlink CRE** | Funding-rate oracle: reads Hyperliquid BTC funding → DON consensus → on-chain `FundingIndex` | `cre/keel-funding` · [`docs/bounty-integrations.md`](docs/bounty-integrations.md) |
+| **Chainlink CRE** | Funding-rate oracle: reads Hyperliquid BTC funding → DON consensus → on-chain `FundingIndex` | `packages/cre/keel-funding` · [`docs/bounty-integrations.md`](docs/bounty-integrations.md) |
 | **LI.FI Composer** | Cross-chain collateral onboarding: fund + open the hedge with USDC from any chain | (integration lead) |
 | **Settlement** | `_fundingSettle` SwapVM opcode over Aqua (no custodial contract — collateral stays live) + `FundingIndex` (write-once latch) | `packages/contracts/src` |
 
@@ -76,7 +76,7 @@ flowchart TB
 | Funding latch (`FundingIndex`, write-once) | **Built** | `packages/contracts/src` |
 | Chainlink CRE consumer (`KeelFundingReceiver` onReport → FundingIndex) | **Built · 14 tests** | `packages/contracts/src` |
 | Deploy script + wiring test (Base mainnet) | **Built · 1 test** | `packages/contracts/script` |
-| Chainlink CRE funding oracle (Hyperliquid → DON → on-chain) | **Built · live write verified on Base mainnet** | `cre/keel-funding` |
+| Chainlink CRE funding oracle (Hyperliquid → DON → on-chain) | **Built · live write verified on Base mainnet** | `packages/cre/keel-funding` |
 | LI.FI cross-chain onboarding | Planned | integration lead |
 | Keel MCP (agent front door) | Planned (M7) | `packages/mcp` |
 | Web app (lock UI + Ethena replay) | Planned (M5) | `apps/web` |
@@ -100,9 +100,9 @@ Verified CRE write — tx [`0xd1b1e41b545a273e29f36a5f40f1238b0f32a3464bf7bc0698
 ```
 keel/
 ├── docs/                 # design doc (source of truth), bounty + CRE notes, hackathon roadmap
-├── cre/                  # Chainlink CRE workflow (TypeScript/bun): Hyperliquid funding → DON → on-chain index
 ├── packages/
-│   ├── contracts/        # Foundry (single env) — settlement core (src/) + SwapVM opcode (src/swapvm/) + deploy (script/)
+│   ├── contracts/        # Foundry (single env) — funding latch + CRE receiver (src/) + SwapVM settlement opcode (src/swapvm/) + deploy (script/)
+│   ├── cre/              # Chainlink CRE workflow (TypeScript/bun): Hyperliquid funding → DON → on-chain index
 │   ├── keeper/           # per-period settle() trigger
 │   └── mcp/              # Keel MCP: read funding + operate the swap; brink → user confirm
 └── apps/

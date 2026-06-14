@@ -1,3 +1,6 @@
 packages:
   - "apps/*"
   - "packages/*"
+  # The Chainlink CRE workflow (packages/cre) is a self-contained bun project with its
+  # own lockfiles and toolchain — keep it out of the pnpm workspace.
+  - "!packages/cre/**"

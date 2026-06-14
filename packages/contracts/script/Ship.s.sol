@@ -8,7 +8,7 @@ import {IAqua} from "@1inch/aqua/src/interfaces/IAqua.sol";
 import {ISwapVM} from "@1inch/swap-vm/src/interfaces/ISwapVM.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {KeelFundingProgram} from "../src/swapvm/KeelFundingProgram.sol";
+import {TenorFundingProgram} from "../src/swapvm/TenorFundingProgram.sol";
 import {MockERC20} from "../test/swapvm/MockERC20.sol";
 
 /// @title Ship — the insurance reserve stands up as the counterparty on Base mainnet
@@ -60,7 +60,7 @@ contract Ship is Script {
 
         // Subscription order (one order, both directions): reserve covers funding when R>F, pulls the
         // premium from the subscriber's wallet when R<F. `hedger` = the bound subscriber.
-        ISwapVM.Order memory order = KeelFundingProgram(PROGRAM)
+        ISwapVM.Order memory order = TenorFundingProgram(PROGRAM)
             .buildProgram(
                 reserve, FUNDING_INDEX, fixedRate, cap, notional, PERIOD_SECONDS, hedger, USDC
             );

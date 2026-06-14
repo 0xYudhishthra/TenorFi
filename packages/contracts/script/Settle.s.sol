@@ -7,8 +7,8 @@ import {console2} from "forge-std/console2.sol";
 import {ISwapVM} from "@1inch/swap-vm/src/interfaces/ISwapVM.sol";
 import {TakerTraitsLib} from "@1inch/swap-vm/src/libs/TakerTraits.sol";
 
-import {KeelFundingProgram} from "../src/swapvm/KeelFundingProgram.sol";
-import {KeelSwapVMRouter} from "../src/swapvm/KeelSwapVMRouter.sol";
+import {TenorFundingProgram} from "../src/swapvm/TenorFundingProgram.sol";
+import {TenorSwapVMRouter} from "../src/swapvm/TenorSwapVMRouter.sol";
 import {FundingIndex} from "../src/FundingIndex.sol";
 
 /// @title Settle — the per-period keeper: the receiving party settles the current period
@@ -47,7 +47,7 @@ contract Settle is Script {
         uint256 notional = vm.envOr("NOTIONAL", uint256(100e6));
 
         // Rebuild the exact shipped subscription order (buildProgram is pure; subscriber = us).
-        ISwapVM.Order memory order = KeelFundingProgram(PROGRAM).buildProgram(
+        ISwapVM.Order memory order = TenorFundingProgram(PROGRAM).buildProgram(
             maker, FUNDING_INDEX, fixedRate, cap, notional, PERIOD_SECONDS, subscriber, USDC
         );
 
@@ -72,13 +72,13 @@ contract Settle is Script {
             // Coverage (R > F): the reserve pays the subscriber. tokenIn = marker (0), tokenOut = USDC.
             uint256 coverage = (uint256(diff) * notional * PERIOD_SECONDS) / (RATE_ONE * 3600);
             console2.log("coverage paid to subscriber (USDC 1e6):", coverage);
-            KeelSwapVMRouter(ROUTER).swap(order, POS, USDC, 0, _takerData(subscriber));
+            TenorSwapVMRouter(ROUTER).swap(order, POS, USDC, 0, _takerData(subscriber));
         } else {
             // Premium (R < F): pulled from the subscriber's wallet. tokenIn = USDC, amount = premium.
             // (The subscriber must have approved USDC to Aqua once at subscribe time.)
             uint256 premium = (uint256(-diff) * notional * PERIOD_SECONDS) / (RATE_ONE * 3600);
             console2.log("premium pulled from subscriber wallet (USDC 1e6):", premium);
-            KeelSwapVMRouter(ROUTER).swap(order, USDC, POS, premium, _takerData(subscriber));
+            TenorSwapVMRouter(ROUTER).swap(order, USDC, POS, premium, _takerData(subscriber));
         }
         vm.stopBroadcast();
 

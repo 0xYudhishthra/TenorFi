@@ -8,8 +8,8 @@ import {ISwapVM} from "@1inch/swap-vm/src/interfaces/ISwapVM.sol";
 import {TakerTraitsLib} from "@1inch/swap-vm/src/libs/TakerTraits.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {KeelSwapVMRouter} from "../../src/swapvm/KeelSwapVMRouter.sol";
-import {KeelFundingProgram} from "../../src/swapvm/KeelFundingProgram.sol";
+import {TenorSwapVMRouter} from "../../src/swapvm/TenorSwapVMRouter.sol";
+import {TenorFundingProgram} from "../../src/swapvm/TenorFundingProgram.sol";
 import {FundingIndex} from "../../src/FundingIndex.sol";
 import {MockERC20} from "./MockERC20.sol";
 
@@ -72,8 +72,8 @@ contract LiveDeploymentForkTest is Test {
         return;
 
         // solhint-disable-next-line no-unreachable
-        KeelSwapVMRouter router = KeelSwapVMRouter(ROUTER);
-        KeelFundingProgram program = KeelFundingProgram(PROGRAM);
+        TenorSwapVMRouter router = TenorSwapVMRouter(ROUTER);
+        TenorFundingProgram program = TenorFundingProgram(PROGRAM);
         assertEq(address(router.AQUA()), AQUA, "deployed router uses canonical Aqua");
 
         int256 F = 1_000_000_000_000; // 1e12 — fixed below the real R so the reserve pays

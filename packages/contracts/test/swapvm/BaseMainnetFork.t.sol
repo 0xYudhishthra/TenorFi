@@ -9,8 +9,8 @@ import {TakerTraitsLib} from "@1inch/swap-vm/src/libs/TakerTraits.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {FundingSettle} from "../../src/swapvm/FundingSettle.sol";
-import {KeelSwapVMRouter} from "../../src/swapvm/KeelSwapVMRouter.sol";
-import {KeelFundingProgram} from "../../src/swapvm/KeelFundingProgram.sol";
+import {TenorSwapVMRouter} from "../../src/swapvm/TenorSwapVMRouter.sol";
+import {TenorFundingProgram} from "../../src/swapvm/TenorFundingProgram.sol";
 import {MockFundingIndex} from "./MockFundingIndex.sol";
 import {MockERC20} from "./MockERC20.sol";
 
@@ -36,7 +36,7 @@ contract BaseMainnetForkTest is Test {
     uint256 internal constant CAP = (ONE * 4) / 100; // 4%
     uint256 internal constant N = 50_000 * 1e6; // 50,000 USDC notional
     int256 internal constant R = int256((ONE * 3) / 100); // realized 3% > F
-    uint256 internal constant NET = 1_000 * 1e6; // (3%-1%) * 50,000 = 1,000 USDC
+    uint256 internal constant NET = 33_333_333; // (3%-1%) * 50,000 * 120/3600 (per-window scale)
 
     address internal lp = makeAddr("lp");
     address internal hedger = makeAddr("hedger");
@@ -70,8 +70,8 @@ contract BaseMainnetForkTest is Test {
             return;
         }
 
-        KeelSwapVMRouter router = new KeelSwapVMRouter(AQUA, "Keel", "1.0.0");
-        KeelFundingProgram program = new KeelFundingProgram(AQUA);
+        TenorSwapVMRouter router = new TenorSwapVMRouter(AQUA, "TenorFi", "1.0.0");
+        TenorFundingProgram program = new TenorFundingProgram(AQUA);
         MockFundingIndex idx = new MockFundingIndex();
         MockERC20 pos = new MockERC20("Keel Position", "KPOS", 18);
 

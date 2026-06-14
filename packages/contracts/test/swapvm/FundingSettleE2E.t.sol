@@ -8,8 +8,8 @@ import {ISwapVM} from "@1inch/swap-vm/src/interfaces/ISwapVM.sol";
 import {TakerTraitsLib} from "@1inch/swap-vm/src/libs/TakerTraits.sol";
 
 import {FundingSettle} from "../../src/swapvm/FundingSettle.sol";
-import {KeelSwapVMRouter} from "../../src/swapvm/KeelSwapVMRouter.sol";
-import {KeelFundingProgram} from "../../src/swapvm/KeelFundingProgram.sol";
+import {TenorSwapVMRouter} from "../../src/swapvm/TenorSwapVMRouter.sol";
+import {TenorFundingProgram} from "../../src/swapvm/TenorFundingProgram.sol";
 import {MockFundingIndex} from "./MockFundingIndex.sol";
 import {MockERC20} from "./MockERC20.sol";
 
@@ -27,8 +27,8 @@ contract FundingSettleE2ETest is Test {
     uint256 internal constant N = 50_000 * 1e6; // 50,000 USDC notional
 
     Aqua internal aqua;
-    KeelSwapVMRouter internal router;
-    KeelFundingProgram internal program;
+    TenorSwapVMRouter internal router;
+    TenorFundingProgram internal program;
     MockFundingIndex internal idx;
     MockERC20 internal usdc;
     MockERC20 internal pos; // position-marker token
@@ -38,8 +38,8 @@ contract FundingSettleE2ETest is Test {
 
     function setUp() public {
         aqua = new Aqua();
-        router = new KeelSwapVMRouter(address(aqua), "Keel", "1.0.0");
-        program = new KeelFundingProgram(address(aqua));
+        router = new TenorSwapVMRouter(address(aqua), "TenorFi", "1.0.0");
+        program = new TenorFundingProgram(address(aqua));
         idx = new MockFundingIndex();
         usdc = new MockERC20("USD Coin", "USDC", 6);
         pos = new MockERC20("TenorFi Position", "TPOS", 18);

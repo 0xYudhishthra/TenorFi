@@ -7,8 +7,8 @@ import {Aqua} from "@1inch/aqua/src/Aqua.sol";
 
 import {FundingIndex} from "../src/FundingIndex.sol";
 import {KeelFundingReceiver} from "../src/KeelFundingReceiver.sol";
-import {KeelSwapVMRouter} from "../src/swapvm/KeelSwapVMRouter.sol";
-import {KeelFundingProgram} from "../src/swapvm/KeelFundingProgram.sol";
+import {TenorSwapVMRouter} from "../src/swapvm/TenorSwapVMRouter.sol";
+import {TenorFundingProgram} from "../src/swapvm/TenorFundingProgram.sol";
 import {MockUSDC} from "../test/mocks/MockUSDC.sol";
 import {MockERC20} from "../test/swapvm/MockERC20.sol";
 
@@ -48,8 +48,8 @@ contract Deploy is Script {
         address aqua;
         FundingIndex fundingIndex;
         KeelFundingReceiver receiver;
-        KeelSwapVMRouter router;
-        KeelFundingProgram program;
+        TenorSwapVMRouter router;
+        TenorFundingProgram program;
         MockERC20 positionToken;
     }
 
@@ -84,8 +84,8 @@ contract Deploy is Script {
         }
 
         // Settlement layer: our own SwapVM router (carries `_fundingSettle`) + the order builder.
-        d.router = new KeelSwapVMRouter(d.aqua, "Keel", "1.0.0");
-        d.program = new KeelFundingProgram(d.aqua);
+        d.router = new TenorSwapVMRouter(d.aqua, "TenorFi", "1.0.0");
+        d.program = new TenorFundingProgram(d.aqua);
 
         // Position-marker token: the swap's `tokenIn` (amountIn 0), distinct from `tokenOut` (USDC)
         // so SwapVM's `tokenIn != tokenOut` invariant holds.
@@ -117,8 +117,8 @@ contract Deploy is Script {
         vm.serializeAddress(k, "Aqua", d.aqua);
         vm.serializeAddress(k, "FundingIndex", address(d.fundingIndex));
         vm.serializeAddress(k, "KeelFundingReceiver", address(d.receiver));
-        vm.serializeAddress(k, "KeelSwapVMRouter", address(d.router));
-        vm.serializeAddress(k, "KeelFundingProgram", address(d.program));
+        vm.serializeAddress(k, "TenorSwapVMRouter", address(d.router));
+        vm.serializeAddress(k, "TenorFundingProgram", address(d.program));
         string memory json = vm.serializeAddress(k, "PositionToken", address(d.positionToken));
         vm.writeJson(json, "./deployments.json");
     }

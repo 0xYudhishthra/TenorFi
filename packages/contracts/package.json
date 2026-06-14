@@ -1,5 +1,5 @@
 {
-  "name": "@keel/contracts",
+  "name": "@tenorfi/contracts",
   "version": "0.0.0",
   "private": true,
   "description": "Keel settlement core (KeelSwap + FundingIndex) + custom SwapVM funding-settlement opcode. Single Foundry environment.",

@@ -5,10 +5,10 @@ import {ISwapVM} from "@1inch/swap-vm/src/interfaces/ISwapVM.sol";
 import {MakerTraitsLib} from "@1inch/swap-vm/src/libs/MakerTraits.sol";
 import {ProgramBuilder, Program} from "@1inch/swap-vm/test/utils/ProgramBuilder.sol";
 
-import {KeelOpcodes} from "./KeelOpcodes.sol";
+import {TenorOpcodes} from "./TenorOpcodes.sol";
 import {FundingSettleArgsBuilder} from "./FundingSettle.sol";
 
-/// @title KeelFundingProgram — builds the reserve's funding-subscription order
+/// @title TenorFundingProgram — builds the reserve's funding-subscription order
 /// @notice Program = a single `_fundingSettle` instruction serving BOTH directions of one
 ///         subscription. The maker (the insurance reserve) ships a strategy holding {positionToken,
 ///         USDC}. Each period the bound `subscriber` (taker) settles:
@@ -17,11 +17,11 @@ import {FundingSettleArgsBuilder} from "./FundingSettle.sol";
 ///           - premium (`R < F`): swap tokenIn = USDC, tokenOut = positionToken — the opcode sets
 ///             `amountIn`, pulled from the subscriber's wallet into the reserve.
 ///         `allowZeroAmountIn` covers the coverage direction; the premium direction has `amountIn > 0`.
-///         Extends `KeelOpcodes` so `_fundingSettle` is in `_opcodes()` at the dispatch index.
-contract KeelFundingProgram is KeelOpcodes {
+///         Extends `TenorOpcodes` so `_fundingSettle` is in `_opcodes()` at the dispatch index.
+contract TenorFundingProgram is TenorOpcodes {
     using ProgramBuilder for Program;
 
-    constructor(address aqua) KeelOpcodes(aqua) {}
+    constructor(address aqua) TenorOpcodes(aqua) {}
 
     /// @param maker           The insurance reserve (covers funding, collects premium).
     /// @param subscriber      The only address allowed to settle this subscription (the taker).

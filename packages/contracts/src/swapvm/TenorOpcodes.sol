@@ -6,12 +6,12 @@ import {AquaOpcodes} from "@1inch/swap-vm/src/opcodes/AquaOpcodes.sol";
 
 import {FundingSettle} from "./FundingSettle.sol";
 
-/// @title KeelOpcodes — Aqua opcode set extended with `_fundingSettle`
+/// @title TenorOpcodes — Aqua opcode set extended with `_fundingSettle`
 /// @notice Shared base for the router (execution) and the program builder (encoding), so the
 ///         bytecode opcode index of `_fundingSettle` is identical on both sides. The custom
 ///         instruction is appended at the END of the set, preserving every existing index
 ///         (the convention the swap-vm comments require for backward compatibility).
-abstract contract KeelOpcodes is AquaOpcodes, FundingSettle {
+abstract contract TenorOpcodes is AquaOpcodes, FundingSettle {
     constructor(address aqua) AquaOpcodes(aqua) {}
 
     function _opcodes()

@@ -1,13 +1,13 @@
-// e2e: POST /hedge (create) + GET /positions + GET /positions/:id against a
-// throwaway :memory: db. Hedge is stubbed so this test is about persistence and
-// the state machine, not LI.FI (covered live in hedge.test.ts).
+// Full-live e2e: POST /hedge runs a REAL LI.FI quote and persists the position
+// into a real SQLite db, then GET /positions + GET /positions/:id read it back.
+// No stubs — the whole chain (HTTP → LI.FI → SQLite) is exercised end to end.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createTransport } from "@keel/hyperliquid";
-import { ok } from "../core/domain/result.js";
-import type { HedgeService } from "../core/services/hedge.js";
+import { CHAINS } from "@keel/lifi";
 import { createFundingService } from "../core/services/funding.js";
+import { createHedgeService } from "../core/services/hedge.js";
 import { createPositionService } from "../core/services/position.js";
 import { createPositionRepo } from "../core/repos/positions.js";
 import { createDb } from "../core/repos/db.js";
@@ -15,22 +15,12 @@ import { createApp } from "./app.js";
 
 const FROM = "0x235713C4CA6A8cd2adc0333F64d1b453BfCdBbfd";
 
-// Deterministic stub — returns a canned quote, never touches the network.
-const stubHedge: HedgeService = {
-  async quoteHedge() {
-    return ok({
-      deposit: { tool: "stub", transactionRequest: { to: FROM } } as never,
-      open: null,
-      notes: ["stub"],
-    });
-  },
-};
-
 function app() {
   return createApp({
     network: "mainnet",
     funding: createFundingService({ transport: createTransport("mainnet") }),
-    hedge: stubHedge,
+    // Real LI.FI client; no keelTarget → open leg skipped (contract not deployed).
+    hedge: createHedgeService({ keelChain: CHAINS.base }),
     positions: createPositionService(createPositionRepo(createDb(":memory:"))),
   });
 }
@@ -41,7 +31,7 @@ function createBody() {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       fromAddress: FROM,
-      fromChain: 8453,
+      fromChain: CHAINS.base,
       perpCollateralUsd: "5",
       keelCollateralUsd: "5",
       market: "BTC",
@@ -49,14 +39,21 @@ function createBody() {
   };
 }
 
-test("POST /hedge creates a position at QUOTED, listed and fetchable", async () => {
+test("POST /hedge persists a position from a real LI.FI quote", async () => {
   const a = app();
 
   const create = await a.request("/hedge", createBody());
   assert.equal(create.status, 201);
-  const created = (await create.json()) as { positionId: string; status: string };
+  const created = (await create.json()) as {
+    positionId: string;
+    status: string;
+    quote: { deposit: { transactionRequest?: unknown }; open: unknown };
+  };
   assert.equal(created.status, "QUOTED");
   assert.ok(created.positionId);
+  // The persisted quote is a real, signable LI.FI step.
+  assert.ok(created.quote.deposit.transactionRequest, "deposit has a transactionRequest");
+  assert.equal(created.quote.open, null);
 
   // Appears in the list.
   const list = await a.request("/positions");
@@ -72,13 +69,12 @@ test("POST /hedge creates a position at QUOTED, listed and fetchable", async () 
   const detail = await a.request(`/positions/${created.positionId}`);
   assert.equal(detail.status, 200);
   const body = (await detail.json()) as {
-    position: { status: string; quote: unknown };
+    position: { status: string; quote: { deposit: unknown } };
     events: Array<{ type: string; toStatus: string }>;
   };
   assert.equal(body.position.status, "QUOTED");
-  assert.ok(body.position.quote);
-  const transitions = body.events.map((e) => e.toStatus);
-  assert.deepEqual(transitions, ["DRAFT", "QUOTED"]);
+  assert.ok(body.position.quote.deposit, "detail carries the deposit leg");
+  assert.deepEqual(body.events.map((e) => e.toStatus), ["DRAFT", "QUOTED"]);
 });
 
 test("GET /positions/:id returns 404 for an unknown id", async () => {

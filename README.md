@@ -3,10 +3,8 @@
 > On-chain fixed-funding-rate swaps — built natively on 1inch Aqua, with collateral that never goes idle. Swap your *variable* perp funding for a *fixed* one, in one click.
 
 - **Design doc** (source of truth): [`docs/design-doc.md`](docs/design-doc.md)
-- **Build plan**: [`docs/build-plan.md`](docs/build-plan.md)
-- **Bounty integrations**: [`docs/bounty-integrations.md`](docs/bounty-integrations.md)
-- **Chainlink CRE notes**: [`docs/chainlink-cre-notes.md`](docs/chainlink-cre-notes.md)
-- **Settlement core**: [`packages/contracts`](packages/contracts) · **Aqua opcode**: [`packages/swapvm`](packages/swapvm)
+- **Bounty integrations** (1inch · Chainlink · LI.FI — diagrams + code): [`docs/bounty-integrations.md`](docs/bounty-integrations.md)
+- **Settlement core**: [`packages/contracts`](packages/contracts) · **Aqua opcode**: [`packages/contracts/src/swapvm`](packages/contracts/src/swapvm)
 
 ---
 
@@ -42,44 +40,40 @@ When a side's collateral can no longer cover one more worst-case period (`remain
 
 | Component | What it does | Where |
 |-----------|--------------|-------|
-| **1inch Aqua / SwapVM** | Custom `_fundingSettle` instruction settles a period as `amountOut = net`; collateral stays live via virtual balances | `packages/swapvm/contracts` |
-| **Chainlink CRE** | Funding-rate oracle: reads Hyperliquid BTC funding → DON consensus → on-chain `FundingIndex` | `packages/cre` · [`docs/chainlink-cre-notes.md`](docs/chainlink-cre-notes.md) |
+| **1inch Aqua / SwapVM** | Custom `_fundingSettle` instruction settles a period as `amountOut = net`; collateral stays live via virtual balances | `packages/contracts/src/swapvm` |
+| **Chainlink CRE** | Funding-rate oracle: reads Hyperliquid BTC funding → DON consensus → on-chain `FundingIndex` | `packages/cre` · [`docs/bounty-integrations.md`](docs/bounty-integrations.md) |
 | **LI.FI Composer** | Cross-chain collateral onboarding: fund + open the hedge with USDC from any chain | (integration lead) |
 | **Settlement core** | `KeelSwap` (matched swap, settlement, no-default) + `FundingIndex` (write-once latch) | `packages/contracts/src` |
 
 ## Architecture
 
-```
- HEDGER (taker) ── takes our rate ──┐          ┌── KEEL LP (maker) — quotes the fixed rate
-                                    ▼          ▼
-        KEEL — funding-rate swap (1inch Aqua / SwapVM, Ethereum Sepolia)
-        • custom _fundingSettle opcode nets fixed-vs-floating each period
-        • collateral stays live in-wallet via Aqua virtual balances
-                    ▲ funding index                  │ collateral-low → human checkpoint
-        ┌───────────┴───────────┐                    ▼
-   CHAINLINK CRE                              USER CONFIRMS (close / re-match / continue, via MCP)
-   Hyperliquid funding → DON → on-chain                settle / payout in USDC
-   LI.FI Composer: USDC collateral cross-chain → into the swap
+```mermaid
+flowchart TB
+    HEDGER["Hedger / taker"] -->|takes our rate| KEEL
+    LP["Keel LP / maker — quotes the fixed rate"] --> KEEL
+    CRE["Chainlink CRE<br/>Hyperliquid funding → DON → on-chain"] -->|funding index| KEEL
+    LIFI["LI.FI Composer<br/>USDC collateral, cross-chain"] --> KEEL
+    KEEL["KEEL swap — 1inch Aqua / SwapVM (Ethereum Sepolia)<br/>custom _fundingSettle opcode · collateral stays live via Aqua virtual balances"]
+    KEEL -->|settle / payout USDC| OUT["Hedger ↔ LP via Aqua virtual balances"]
+    KEEL -.->|collateral-low| BRINK["User confirms via MCP<br/>close / re-match / continue"]
 ```
 
 ## The settlement loop
 
-```
-Hyperliquid BTC funding (hourly, the public number)
-        ↓   Chainlink CRE: HTTP fetch → DON consensus → KeystoneForwarder
-FundingIndex.setFundingIndex(period, R)            on Ethereum Sepolia
-        ↓   keeper fires settle() each period
-_fundingSettle opcode (or KeelSwap): net = clamp(R − F, ±cap) × N
-        ↓
-USDC moves hedger ↔ LP via Aqua virtual balances   (collateral never locked)
+```mermaid
+flowchart TB
+    A["Hyperliquid BTC funding (hourly — the public number)"] -->|"CRE: fetch → DON → KeystoneForwarder"| B["FundingIndex.setFundingIndex(period, R)<br/>on Ethereum Sepolia"]
+    B -->|"keeper fires settle() each period"| C["_fundingSettle opcode / KeelSwap<br/>net = clamp(R − F, ±cap) × N"]
+    C --> D["USDC moves hedger ↔ LP via Aqua virtual balances<br/>(collateral never locked)"]
 ```
 
 ## Status
 
 | Component | Status | Where |
 |-----------|--------|-------|
-| Settlement core (`KeelSwap` + `FundingIndex`) | **Built · 25 tests** | `packages/contracts` |
-| Custom SwapVM opcode (`_fundingSettle` + router + program) | **Built · 5 tests** (incl. e2e moving real USDC via Aqua) | `packages/swapvm` |
+| Settlement core (`KeelSwap` + `FundingIndex`) | **Built · 25 tests** | `packages/contracts/src` |
+| Custom SwapVM opcode (`_fundingSettle` + router + program) | **Built · unit-tested (4)**; live Sepolia settlement pending | `packages/contracts/src/swapvm` |
+| Deploy script + wiring test (Ethereum Sepolia) | **Built · 1 test** | `packages/contracts/script` |
 | Chainlink CRE funding oracle | Planned (M2) | `packages/cre` |
 | LI.FI cross-chain onboarding | Planned | integration lead |
 | Keel MCP (agent front door) | Planned (M7) | `packages/mcp` |
@@ -92,8 +86,7 @@ USDC moves hedger ↔ LP via Aqua virtual balances   (collateral never locked)
 keel/
 ├── docs/                 # design doc (source of truth), build plan, bounty + CRE notes
 ├── packages/
-│   ├── contracts/        # Foundry — KeelSwap + FundingIndex (settlement core)
-│   ├── swapvm/           # Hardhat — custom _fundingSettle SwapVM opcode (the Aqua app)
+│   ├── contracts/        # Foundry (single env) — settlement core (src/) + SwapVM opcode (src/swapvm/) + deploy (script/)
 │   ├── cre/              # Chainlink CRE workflow: Hyperliquid funding → on-chain index
 │   ├── keeper/           # per-period settle() trigger
 │   └── mcp/              # Keel MCP: read funding + operate the swap; brink → user confirm
@@ -103,19 +96,20 @@ keel/
 
 ## Quickstart
 
-Settlement core (Foundry):
+Everything is one Foundry package:
 
 ```bash
 cd packages/contracts
-forge test            # 25 tests
+pnpm install          # @1inch/swap-vm + @1inch/aqua (needed to build the SwapVM opcode)
+forge test            # 30 tests
 ```
 
-Aqua opcode (Hardhat):
+Deploy to Ethereum Sepolia:
 
 ```bash
-cd packages/swapvm
-npm install           # pulls @1inch/swap-vm + @1inch/aqua
-npx hardhat test      # 5 tests, incl. e2e: the opcode moves USDC through Aqua
+forge script script/Deploy.s.sol:Deploy \
+  --rpc-url $SEPOLIA_RPC_URL --private-key $PRIVATE_KEY --broadcast
+# writes deployments.json
 ```
 
 ## Tech stack
@@ -123,7 +117,7 @@ npx hardhat test      # 5 tests, incl. e2e: the opcode moves USDC through Aqua
 | Layer | Choice |
 |-------|--------|
 | Settlement contracts | Solidity 0.8.30, Foundry |
-| Aqua app | 1inch SwapVM custom instruction (Hardhat) |
+| Aqua app | 1inch SwapVM custom instruction (Foundry) |
 | Funding oracle | Chainlink CRE (reads Hyperliquid funding) |
 | Cross-chain onboarding | LI.FI Composer |
 | Settlement currency / chain | USDC on Ethereum Sepolia |

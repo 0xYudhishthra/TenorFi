@@ -26,6 +26,7 @@ packages/contracts/broadcast/
 # --- misc ---
 .DS_Store
 *.log
+packages/lifi/deposit.html
 coverage/
 .idea/
 .vscode/

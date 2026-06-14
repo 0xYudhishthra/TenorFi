@@ -12,13 +12,35 @@ import {
   type Offer,
 } from "@/lib/tenorfi-data";
 import { useAppKit } from "@reown/appkit/react";
-import { useAccount, useChainId, useSwitchChain } from "wagmi";
+import { useAccount, useChainId, useSwitchChain, useSendTransaction } from "wagmi";
 import { truncateAddress, BASE_CHAIN_ID } from "@/lib/wallet";
-import { quoteHedge, type HedgeQuote } from "@/lib/api";
+import { quoteHedge, getFunding, type HedgeQuote } from "@/lib/api";
 
-const CAP = 0.04; // per-period funding clamp → pre-locked collateral = cap × notional
+const CAP = 0.04; // per-period funding clamp → reserve coverage = cap × notional
 const commas = (n: number) => n.toLocaleString("en-US");
 const parseNum = (s: string) => parseInt(String(s).replace(/[^0-9]/g, ""), 10) || 0;
+
+/**
+ * The signable tx carried by each LI.FI leg. `quote.deposit` is a LI.FI classic
+ * step (LiFiStep) and `quote.open` is a Composer ACTIVATE result; both expose a
+ * `transactionRequest` with this shape. api.ts types them as `unknown`, so we
+ * narrow locally and guard every field before sending.
+ */
+interface LegTxRequest {
+  to?: string;
+  data?: string;
+  value?: string | number;
+  gasLimit?: string | number;
+  gas?: string | number;
+}
+function legTx(leg: unknown): LegTxRequest | null {
+  if (!leg || typeof leg !== "object") return null;
+  const req = (leg as { transactionRequest?: unknown }).transactionRequest;
+  if (!req || typeof req !== "object") return null;
+  const r = req as LegTxRequest;
+  return typeof r.to === "string" && r.to.length > 0 ? r : null;
+}
+const BASESCAN_TX = (h: string) => `https://basescan.org/tx/${h}`;
 
 function offersForTenor(t: number): Offer[] {
   const match = OFFERS.filter((o) => o.tenor === t);
@@ -42,16 +64,37 @@ export default function CreatePositionPage() {
   // error message if the API was unreachable. No fabricated tx hashes.
   const [quote, setQuote] = useState<HedgeQuote | null>(null);
   const [quoteError, setQuoteError] = useState<string | null>(null);
+  // On-chain submit state. The deposit (LI.FI classic) and activate (Composer)
+  // legs are sent from the connected Base wallet; hashes are the real on-chain
+  // hashes returned by the wallet — never fabricated.
+  const [submitting, setSubmitting] = useState(false);
+  const [depositTxHash, setDepositTxHash] = useState<`0x${string}` | null>(null);
+  const [openTxHash, setOpenTxHash] = useState<`0x${string}` | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const { open } = useAppKit();
   const { address, isConnected, isConnecting } = useAccount();
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
+  const { sendTransactionAsync } = useSendTransaction();
   const isOnBase = chainId === BASE_CHAIN_ID;
   const walletReady = isConnected && Boolean(address) && isOnBase;
 
-  // floating ticker
+  // Live funding for the "Floating now" ticker. Pull the current BTC funding
+  // snapshot from keel-api once on mount and use its annualized rate (fraction
+  // → %). Falls back to the animated mock below if the fetch fails.
+  const [liveFloat, setLiveFloat] = useState<number | null>(null);
   useEffect(() => {
+    const ctrl = new AbortController();
+    getFunding("BTC", ctrl.signal)
+      .then((snap) => setLiveFloat(snap.annualized * 100))
+      .catch(() => setLiveFloat(null)); // keep the mock ticker
+    return () => ctrl.abort();
+  }, []);
+
+  // floating ticker (mock fallback — only animates while live funding is absent)
+  useEffect(() => {
+    if (liveFloat !== null) return;
     const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     if (reduce) return;
     let f = 41.7;
@@ -61,7 +104,10 @@ export default function CreatePositionPage() {
       setFloat(f);
     }, 1500);
     return () => window.clearInterval(id);
-  }, []);
+  }, [liveFloat]);
+
+  // What the ticket shows for "Floating now": live funding if available, mock otherwise.
+  const floatPct = liveFloat ?? float;
 
   const offers = useMemo(() => offersForTenor(tenor), [tenor]);
   // drop selection if no longer present for the tenor
@@ -78,6 +124,20 @@ export default function CreatePositionPage() {
     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  // Map a LI.FI leg's transactionRequest onto wagmi's sendTransactionAsync.
+  // value/gas are optional; gasLimit (Composer) or gas — whichever is present —
+  // becomes wagmi's `gas`. Returns the real on-chain tx hash from the wallet.
+  const sendLeg = async (req: LegTxRequest): Promise<`0x${string}`> => {
+    const rawValue = req.value;
+    const rawGas = req.gasLimit ?? req.gas;
+    return sendTransactionAsync({
+      to: req.to as `0x${string}`,
+      data: req.data as `0x${string}` | undefined,
+      value: rawValue !== undefined ? BigInt(rawValue) : undefined,
+      gas: rawGas !== undefined ? BigInt(rawGas) : undefined,
+    });
+  };
+
   const confirm = async () => {
     // Require a connected wallet on Base before subscribing. Wallet logic lives
     // in useWallet() and is untouched here — we only read the address.
@@ -85,16 +145,22 @@ export default function CreatePositionPage() {
     setSigning(true);
     setQuote(null);
     setQuoteError(null);
+    setSubmitError(null);
+    setDepositTxHash(null);
+    setOpenTxHash(null);
 
-    // The pre-locked collateral is what TenorFi locks per period; we fund the
-    // perp leg with the same magnitude for the demo. Both are decimal USDC
-    // strings (>0) as keel-api requires.
+    // The subscriber posts ZERO collateral — they only approve Aqua to pull the
+    // premium. `perpCollateralUsd` funds the Hyperliquid perp margin via LI.FI;
+    // it is sized to the reserve coverage magnitude for the demo. Both are
+    // decimal USDC strings (>0) as keel-api requires.
     const collateral = Math.max(1, prelock).toString();
+
+    let result: HedgeQuote;
     try {
       // Real two-leg quote from keel-api. The API never signs; it returns
-      // unsigned LI.FI legs. The open (KeelSwap) leg is skipped until the
-      // contract is wired — surfaced via `notes`.
-      const result = await quoteHedge({
+      // unsigned LI.FI legs: `deposit` (LI.FI classic, perp margin) and `open`
+      // (Composer ACTIVATE, approves Aqua on Base — may be null).
+      result = await quoteHedge({
         fromAddress: address as `0x${string}`,
         fromChain: BASE_CHAIN_ID,
         perpCollateralUsd: collateral,
@@ -105,9 +171,41 @@ export default function CreatePositionPage() {
       setQuoteError(
         err instanceof Error ? err.message : "keel-api unreachable — quote unavailable",
       );
-    } finally {
       setSigning(false);
       goStep(3);
+      return;
+    }
+
+    // Quote built — now submit the legs from the connected Base wallet. Send the
+    // deposit (perp margin, cross-chain) first, await its hash, THEN the activate
+    // leg (approve Aqua on Base). Stop on any wallet rejection — never advance to
+    // the next leg, never fabricate a hash.
+    setSigning(false);
+    goStep(3);
+    setSubmitting(true);
+    try {
+      const depositReq = legTx(result.deposit);
+      if (depositReq) {
+        const hash = await sendLeg(depositReq);
+        setDepositTxHash(hash);
+      } else {
+        setSubmitError("Deposit leg has no signable transaction.");
+        setSubmitting(false);
+        return;
+      }
+
+      // Activate (approve Aqua) leg — only if keel-api built it.
+      const openReq = result.open ? legTx(result.open) : null;
+      if (openReq) {
+        const hash = await sendLeg(openReq);
+        setOpenTxHash(hash);
+      }
+    } catch (err) {
+      setSubmitError(
+        err instanceof Error ? err.message : "Wallet rejected or the transaction failed.",
+      );
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -234,6 +332,10 @@ export default function CreatePositionPage() {
                 <b>max coverage</b> — the most the position pays out, pre-funded so no
                 default is possible.
               </p>
+              {/* The fixed-rate OFFERS are mock (no api endpoint). The selected
+                  offer rate is DISPLAY-ONLY — the keel-api hedge quote uses its
+                  own fixed rate server-side. Future work: pass offer.fixedRate
+                  through to quoteHedge so the displayed rate drives the quote. */}
               <div className="offers">
                 {offers.map((o) => (
                   <div
@@ -284,8 +386,8 @@ export default function CreatePositionPage() {
             <section className="step-card card">
               <h2>Review &amp; confirm</h2>
               <p className="hint">
-                One signature opens both legs. LI.FI Composer brings your USDC cross-chain
-                and deposits into the Hyperliquid perp and the TenorFi position together.
+                Two transactions — LI.FI Composer deposits your USDC cross-chain into the
+                perp, and activates the TenorFi subscription on Base.
               </p>
               <div className="rev">
                 {[
@@ -294,7 +396,7 @@ export default function CreatePositionPage() {
                   ["Tenor", `${tenor} days`],
                   ["Fixed rate (locked)", `${fmtPct(offer.fixedRate)} APR`],
                   ["Max coverage", fmtUSDfull(offer.maxCoverage)],
-                  ["Collateral pre-locked", `${fmtUSDfull(prelock)} / period`],
+                  ["Reserve coverage (pre-funded)", `${fmtUSDfull(prelock)} / period`],
                   ["Settlement", "USDC · hourly · Base mainnet"],
                   ["Subscriber", address ? truncateAddress(address) : "Not connected"],
                 ].map(([k, v], i) => (
@@ -309,11 +411,11 @@ export default function CreatePositionPage() {
               <div className="legrow">
                 <div className="leg">
                   <div className="t">① Hyperliquid perp</div>
-                  <div className="d">Collateral deposited via LI.FI; the perp order is placed in the same flow.</div>
+                  <div className="d">LI.FI deposits the perp margin cross-chain; the perp order is placed by the TenorFi agent via the Hyperliquid API.</div>
                 </div>
                 <div className="leg">
-                  <div className="t">② TenorFi position</div>
-                  <div className="d">Your collateral ships into Aqua as a live virtual balance.</div>
+                  <div className="t">② TenorFi subscription</div>
+                  <div className="d">You approve Aqua to pull the fixed premium as it&apos;s due — you lock no collateral; the reserve pre-funds coverage.</div>
                 </div>
               </div>
               <div className="rev" style={{ marginTop: 14 }}>
@@ -369,9 +471,9 @@ export default function CreatePositionPage() {
                 )}
               </div>
               <p style={{ fontSize: 12, color: "var(--fg-tertiary)", marginTop: 12, lineHeight: 1.5 }}>
-                The actual on-chain subscribe is handled by the LI.FI Composer onboarding — one
-                signature brings your USDC cross-chain and opens both legs. A connected wallet on
-                Base is required first.
+                Onboarding is two transactions — LI.FI Composer deposits your USDC cross-chain
+                into the perp, then activates the TenorFi subscription on Base. A connected wallet
+                on Base is required first.
               </p>
             </section>
           )}
@@ -437,6 +539,78 @@ export default function CreatePositionPage() {
                   )}
                 </div>
 
+                {/* On-chain submit — the two legs are sent from the connected Base
+                    wallet. We show the REAL tx hashes as they land (never fabricated)
+                    and link each to BaseScan. Rendered only when a quote was built. */}
+                {quote && (
+                  <div className="rev" style={{ maxWidth: 520, margin: "14px auto 0", textAlign: "left" }}>
+                    <div className="r">
+                      <span className="k">On-chain submit</span>
+                      <span className="v">
+                        <span
+                          className={`badge ${!submitting && (openTxHash || depositTxHash) && !submitError ? "badge-up" : "badge-clay"}`}
+                          style={{ fontSize: 10 }}
+                        >
+                          <span className="dot" />{" "}
+                          {submitting
+                            ? "signing in wallet…"
+                            : submitError
+                              ? "stopped"
+                              : openTxHash || depositTxHash
+                                ? "sent"
+                                : "awaiting wallet"}
+                        </span>
+                      </span>
+                    </div>
+                    <div className="r">
+                      <span className="k">① Perp deposit tx</span>
+                      <span className="v" style={{ textAlign: "right" }}>
+                        {depositTxHash ? (
+                          <a
+                            href={BASESCAN_TX(depositTxHash)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mono"
+                            style={{ fontSize: 12.5, color: "var(--up)" }}
+                          >
+                            {truncateAddress(depositTxHash)} ↗
+                          </a>
+                        ) : (
+                          <span style={{ fontSize: 12.5, color: "var(--fg-tertiary)" }}>—</span>
+                        )}
+                      </span>
+                    </div>
+                    <div className="r">
+                      <span className="k">② Activate Aqua tx</span>
+                      <span className="v" style={{ textAlign: "right" }}>
+                        {openTxHash ? (
+                          <a
+                            href={BASESCAN_TX(openTxHash)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mono"
+                            style={{ fontSize: 12.5, color: "var(--up)" }}
+                          >
+                            {truncateAddress(openTxHash)} ↗
+                          </a>
+                        ) : (
+                          <span style={{ fontSize: 12.5, color: "var(--fg-tertiary)" }}>
+                            {quote.open ? "—" : "Skipped"}
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                    {submitError && (
+                      <div className="r" style={{ alignItems: "flex-start" }}>
+                        <span className="k">Error</span>
+                        <span className="v" style={{ textAlign: "right", fontSize: 12.5, color: "var(--clay-600)", lineHeight: 1.5 }}>
+                          {submitError}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="flow-actions" style={{ justifyContent: "center" }}>
                   <Link href="/explorer" className="btn btn-primary btn-lg">
                     Go to explorer →
@@ -470,12 +644,12 @@ export default function CreatePositionPage() {
               <span className="v">{offer ? fmtUSDfull(offer.maxCoverage) : "—"}</span>
             </div>
             <div className="row">
-              <span className="k">Collateral (pre-locked)</span>
-              <span className="v">{fmtUSDfull(prelock)}</span>
+              <span className="k">Reserve coverage (pre-funded)</span>
+              <span className="v">{fmtUSDfull(prelock)} / period</span>
             </div>
             <div className="row">
               <span className="k">Floating now</span>
-              <span className="v flt">+{float.toFixed(1)}%</span>
+              <span className="v flt">+{floatPct.toFixed(1)}%</span>
             </div>
             <div className="row">
               <span className="k">Your net funding</span>
@@ -483,8 +657,8 @@ export default function CreatePositionPage() {
             </div>
           </div>
           <p style={{ fontSize: 12.5, color: "var(--fg-tertiary)", marginTop: 14, padding: "0 6px", lineHeight: 1.5 }}>
-            Non-custodial. Collateral stays in your wallet as an Aqua virtual balance. You
-            approve every transaction.
+            Non-custodial — you lock no collateral. You only approve Aqua to pull the fixed
+            premium as it&apos;s due; the reserve pre-funds the coverage.
           </p>
         </aside>
       </div>

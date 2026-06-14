@@ -1,11 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import type EthereumProvider from "@walletconnect/ethereum-provider";
 
 /* ============================================================================
-   TenorFi — dependency-free wallet hook.
-   Wraps the injected EIP-1193 provider (window.ethereum) directly.
-   No wagmi / RainbowKit / web3modal. SSR-safe (all window access is guarded).
+   TenorFi — WalletConnect wallet hook.
+   Built on @walletconnect/ethereum-provider, which exposes an EIP-1193-compatible
+   provider. The QR modal ships with the provider (showQrModal: true) — no extra
+   UI dependency. SSR-safe: the provider is only ever initialised inside effects
+   and event handlers, never during render/SSR.
    ============================================================================ */
 
 /** Base mainnet. */
@@ -20,26 +23,7 @@ const BASE_PARAMS = {
   blockExplorerUrls: ["https://basescan.org"],
 };
 
-/** Minimal EIP-1193 provider surface we rely on. */
-export interface EIP1193Provider {
-  request: (args: { method: string; params?: unknown[] | object }) => Promise<unknown>;
-  on: (event: string, handler: (...args: unknown[]) => void) => void;
-  removeListener: (event: string, handler: (...args: unknown[]) => void) => void;
-  isMetaMask?: boolean;
-}
-
-declare global {
-  // eslint-disable-next-line no-var
-  interface Window {
-    ethereum?: EIP1193Provider;
-  }
-}
-
-/** Provider getter — always SSR-safe. Returns undefined during render/SSR. */
-function getProvider(): EIP1193Provider | undefined {
-  if (typeof window === "undefined") return undefined;
-  return window.ethereum;
-}
+const WC_PROJECT_ID = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ?? "";
 
 /** Shorten an address for display: 0x1234…abcd */
 export function truncateAddress(addr: string): string {
@@ -56,18 +40,54 @@ function parseChainId(raw: unknown): number | null {
   return null;
 }
 
+/* ----------------------------------------------------------------------------
+   Lazy, cached WalletConnect provider.
+   EthereumProvider.init() touches window/indexedDB, so it must NEVER run during
+   SSR. Callers (effects, event handlers) are always client-side.
+   ---------------------------------------------------------------------------- */
+let providerPromise: Promise<EthereumProvider> | null = null;
+
+async function getProvider(): Promise<EthereumProvider> {
+  if (typeof window === "undefined") {
+    throw new Error("WalletConnect provider is only available in the browser.");
+  }
+  if (!WC_PROJECT_ID) {
+    throw new Error(
+      "WalletConnect projectId missing. Set NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID (free at https://cloud.reown.com).",
+    );
+  }
+  if (!providerPromise) {
+    // Dynamic import keeps the WC bundle out of the SSR/render path entirely.
+    providerPromise = import("@walletconnect/ethereum-provider").then(({ default: EthereumProvider }) =>
+      EthereumProvider.init({
+        projectId: WC_PROJECT_ID,
+        chains: [BASE_CHAIN_ID],
+        optionalChains: [BASE_CHAIN_ID],
+        showQrModal: true,
+        metadata: {
+          name: "TenorFi",
+          description: "Fixed-rate funding subscription",
+          url: "https://tenorfi.up.railway.app",
+          icons: ["https://tenorfi.up.railway.app/tenorfi-logo.png"],
+        },
+      }),
+    );
+  }
+  return providerPromise;
+}
+
 export interface WalletState {
   address: string | null;
   chainId: number | null;
   isConnecting: boolean;
   error: string | null;
-  /** True only on the client when an injected provider exists. */
+  /** Always true — WalletConnect needs no injected wallet. Kept for callers. */
   hasWallet: boolean;
   /** True when connected AND on Base mainnet. */
   isOnBase: boolean;
   connect: () => Promise<string | null>;
   switchToBase: () => Promise<void>;
-  disconnect: () => void;
+  disconnect: () => Promise<void>;
 }
 
 export function useWallet(): WalletState {
@@ -75,35 +95,14 @@ export function useWallet(): WalletState {
   const [chainId, setChainId] = useState<number | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [hasWallet, setHasWallet] = useState(false);
 
-  // Detect provider + restore an already-authorized account on mount.
+  // Restore an existing WalletConnect session on mount and wire up listeners.
   useEffect(() => {
-    const provider = getProvider();
-    if (!provider) {
-      setHasWallet(false);
-      return;
-    }
-    setHasWallet(true);
-
+    if (typeof window === "undefined") return;
     let cancelled = false;
 
-    // Restore the chosen account across reloads (no prompt — silent).
-    (async () => {
-      try {
-        const accounts = (await provider.request({ method: "eth_accounts" })) as string[];
-        if (!cancelled && accounts && accounts.length > 0) {
-          setAddress(accounts[0]);
-        }
-        const cid = await provider.request({ method: "eth_chainId" });
-        if (!cancelled) setChainId(parseChainId(cid));
-      } catch {
-        /* silent — user simply isn't connected yet */
-      }
-    })();
-
-    const handleAccountsChanged = (...args: unknown[]) => {
-      const accounts = args[0] as string[] | undefined;
+    // Handlers are declared here so cleanup can remove the exact references.
+    const handleAccountsChanged = (accounts: string[]) => {
       if (accounts && accounts.length > 0) {
         setAddress(accounts[0]);
         setError(null);
@@ -111,31 +110,54 @@ export function useWallet(): WalletState {
         setAddress(null);
       }
     };
-
-    const handleChainChanged = (...args: unknown[]) => {
-      setChainId(parseChainId(args[0]));
+    const handleChainChanged = (cid: string) => {
+      setChainId(parseChainId(cid));
+    };
+    const handleDisconnect = () => {
+      setAddress(null);
+      setChainId(null);
     };
 
-    provider.on("accountsChanged", handleAccountsChanged);
-    provider.on("chainChanged", handleChainChanged);
+    let provider: EthereumProvider | null = null;
+
+    (async () => {
+      try {
+        provider = await getProvider();
+        if (cancelled) return;
+
+        // If a session already exists, surface the connected account silently.
+        if (provider.session && provider.accounts && provider.accounts.length > 0) {
+          setAddress(provider.accounts[0]);
+          setChainId(parseChainId(provider.chainId));
+        }
+
+        provider.on("accountsChanged", handleAccountsChanged);
+        provider.on("chainChanged", handleChainChanged);
+        provider.on("disconnect", handleDisconnect);
+      } catch {
+        /* No projectId / init failure — surfaced on explicit connect() instead. */
+      }
+    })();
 
     return () => {
       cancelled = true;
-      provider.removeListener("accountsChanged", handleAccountsChanged);
-      provider.removeListener("chainChanged", handleChainChanged);
+      if (provider) {
+        provider.removeListener("accountsChanged", handleAccountsChanged);
+        provider.removeListener("chainChanged", handleChainChanged);
+        provider.removeListener("disconnect", handleDisconnect);
+      }
     };
   }, []);
 
   const connect = useCallback(async (): Promise<string | null> => {
-    const provider = getProvider();
-    if (!provider) {
-      setError("No wallet detected. Install a browser wallet to continue.");
-      return null;
-    }
     setIsConnecting(true);
     setError(null);
     try {
-      const accounts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
+      const provider = await getProvider();
+      // Opens the WalletConnect QR modal (showQrModal: true) and resolves once
+      // the wallet approves the session.
+      await provider.connect();
+      const accounts = (await provider.request({ method: "eth_accounts" })) as string[];
       const cid = await provider.request({ method: "eth_chainId" });
       setChainId(parseChainId(cid));
       const addr = accounts && accounts.length > 0 ? accounts[0] : null;
@@ -144,7 +166,11 @@ export function useWallet(): WalletState {
     } catch (err) {
       // EIP-1193 user-rejected error code is 4001.
       const e = err as { code?: number; message?: string };
-      setError(e?.code === 4001 ? "Connection request rejected." : e?.message || "Failed to connect wallet.");
+      setError(
+        e?.code === 4001
+          ? "Connection request rejected."
+          : e?.message || "Failed to connect wallet.",
+      );
       return null;
     } finally {
       setIsConnecting(false);
@@ -152,13 +178,9 @@ export function useWallet(): WalletState {
   }, []);
 
   const switchToBase = useCallback(async (): Promise<void> => {
-    const provider = getProvider();
-    if (!provider) {
-      setError("No wallet detected.");
-      return;
-    }
     setError(null);
     try {
+      const provider = await getProvider();
       await provider.request({
         method: "wallet_switchEthereumChain",
         params: [{ chainId: BASE_CHAIN_ID_HEX }],
@@ -168,6 +190,7 @@ export function useWallet(): WalletState {
       const e = err as { code?: number; message?: string };
       if (e?.code === 4902) {
         try {
+          const provider = await getProvider();
           await provider.request({
             method: "wallet_addEthereumChain",
             params: [BASE_PARAMS],
@@ -184,10 +207,17 @@ export function useWallet(): WalletState {
     }
   }, []);
 
-  const disconnect = useCallback(() => {
-    // Injected providers have no programmatic disconnect; clear local state.
-    setAddress(null);
-    setError(null);
+  const disconnect = useCallback(async (): Promise<void> => {
+    try {
+      const provider = await getProvider();
+      await provider.disconnect();
+    } catch {
+      /* If there's no live session, just clear local state below. */
+    } finally {
+      setAddress(null);
+      setChainId(null);
+      setError(null);
+    }
   }, []);
 
   return {
@@ -195,7 +225,7 @@ export function useWallet(): WalletState {
     chainId,
     isConnecting,
     error,
-    hasWallet,
+    hasWallet: true,
     isOnBase: address !== null && chainId === BASE_CHAIN_ID,
     connect,
     switchToBase,

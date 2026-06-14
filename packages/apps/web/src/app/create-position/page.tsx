@@ -43,7 +43,7 @@ export default function CreatePositionPage() {
   const [quote, setQuote] = useState<HedgeQuote | null>(null);
   const [quoteError, setQuoteError] = useState<string | null>(null);
 
-  const { address, isOnBase, isConnecting, hasWallet, connect, switchToBase } = useWallet();
+  const { address, isOnBase, isConnecting, connect, switchToBase } = useWallet();
   const walletReady = Boolean(address) && isOnBase;
 
   // floating ticker
@@ -331,16 +331,7 @@ export default function CreatePositionPage() {
                 <button className="btn btn-ghost btn-lg" onClick={() => goStep(1)}>
                   ← Back
                 </button>
-                {!hasWallet ? (
-                  <a
-                    href="https://metamask.io"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn btn-primary btn-lg"
-                  >
-                    Install a wallet to subscribe
-                  </a>
-                ) : !address ? (
+                {!address ? (
                   <button
                     className="btn btn-primary btn-lg"
                     disabled={isConnecting}

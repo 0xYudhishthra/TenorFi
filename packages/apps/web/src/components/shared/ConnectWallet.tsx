@@ -3,27 +3,13 @@
 import { useWallet, truncateAddress } from "@/lib/wallet";
 
 /**
- * Wallet connect button for the top nav.
- * States: no-wallet → install link · disconnected → "Connect Wallet" ·
- * connected + wrong chain → "Switch to Base" · connected + Base → truncated address.
+ * Wallet connect button for the top nav (WalletConnect).
+ * States: disconnected → "Connect Wallet" (opens WC QR modal) ·
+ * connected + wrong chain → "Switch to Base" · connected + Base → truncated
+ * address with a Disconnect affordance (WC sessions persist across reloads).
  */
 export default function ConnectWallet() {
-  const { address, isConnecting, hasWallet, isOnBase, connect, switchToBase } = useWallet();
-
-  // No injected wallet — point the user at MetaMask.
-  if (!hasWallet) {
-    return (
-      <a
-        href="https://metamask.io"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="btn btn-ghost btn-sm"
-        title="No wallet detected — install one to connect"
-      >
-        Install a wallet
-      </a>
-    );
-  }
+  const { address, isConnecting, isOnBase, connect, switchToBase, disconnect } = useWallet();
 
   // Disconnected.
   if (!address) {
@@ -45,13 +31,17 @@ export default function ConnectWallet() {
     );
   }
 
-  // Connected on Base.
+  // Connected on Base. Click to disconnect (WalletConnect session persists).
   return (
-    <span className="btn btn-ghost btn-sm mono" title={address} style={{ cursor: "default" }}>
+    <button
+      className="btn btn-ghost btn-sm mono"
+      title={`${address} · click to disconnect`}
+      onClick={disconnect}
+    >
       <span className="badge badge-up" style={{ height: 22, padding: "0 8px", fontSize: 11 }}>
         <span className="dot" />
       </span>
       {truncateAddress(address)}
-    </span>
+    </button>
   );
 }

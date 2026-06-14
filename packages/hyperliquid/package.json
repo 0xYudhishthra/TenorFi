@@ -19,7 +19,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --import tsx --test \"src/**/*.test.ts\""
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
+    "validate:write": "node --env-file=../../.env --import tsx scripts/validate-write.ts"
   },
   "dependencies": {
     "@nktkas/hyperliquid": "^0.32.2",
